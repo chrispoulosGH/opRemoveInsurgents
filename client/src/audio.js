@@ -127,6 +127,10 @@ export function playDronesDepleted() {
   speakFemale('Drones depleted');
 }
 
+export function playMaxTargetsLit() {
+  speakFemale('Maximum number of targets are lit');
+}
+
 /**
  * Speak "Deploying strike force" — returns a Promise that resolves when done.
  */

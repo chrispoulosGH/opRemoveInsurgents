@@ -5,14 +5,14 @@ import { playMissileLaunch } from '../audio';
 const SFX = ['/sfx/jet-engine.mp3', '/sfx/blast1.mp3'];
 SFX.forEach(src => { const a = new Audio(src); a.preload = 'auto'; a.load(); });
 
-const CELL_PX     = 30;
-const BORDER_PX   = 60;
+const CELL_PX_DEFAULT   = 30;
+const BORDER_PX_DEFAULT = 60;
 const JET_COUNT   = 10;
 const JET_GAP     = 38;    // px between jets vertically
 const FLY_IN_DUR  = 5.4;   // seconds for jets to reach grid edge
 const PAUSE_DUR   = 0.35;  // seconds jets hover before firing
-const STAGGER     = 0.14;  // seconds between successive missile launches
-const SPEED       = 300;   // missile px / second
+const STAGGER     = 0;     // seconds between successive missile launches
+const SPEED       = 450;   // missile px / second
 const POST_PAUSE  = 0.7;   // seconds after last impact before jets leave
 const FLY_OUT_DUR = 3.6;   // seconds for jets to exit left
 
@@ -145,7 +145,7 @@ function tickFlash(ctx, m, dt) {
 
 // ── component ────────────────────────────────────────────────────────────────
 
-export default function AirStrike({ targets, gridRef, onCellImpact, onDone }) {
+export default function AirStrike({ targets, gridRef, cellPx = CELL_PX_DEFAULT, borderPx = BORDER_PX_DEFAULT, onCellImpact, onDone }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -170,8 +170,8 @@ export default function AirStrike({ targets, gridRef, onCellImpact, onDone }) {
     // missiles — one per target, assigned to jets round-robin
     const missiles = targets.map((t, i) => {
       const jet = jets[i % JET_COUNT];
-      const tx  = rect.left + BORDER_PX + t.col * CELL_PX + CELL_PX / 2;
-      const ty  = rect.top  + BORDER_PX + t.row * CELL_PX + CELL_PX / 2;
+      const tx  = rect.left + borderPx + t.col * cellPx + cellPx / 2;
+      const ty  = rect.top  + borderPx + t.row * cellPx + cellPx / 2;
       const dx  = tx - destX;
       const dy  = ty - jet.y;
       return {

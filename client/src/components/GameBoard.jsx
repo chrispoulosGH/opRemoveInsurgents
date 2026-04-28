@@ -35,6 +35,7 @@ export default function GameBoard({
   airStriking,      // bool — true while airstrike animation is running
   runnersActive,    // bool — true 0.5s after airstrike done, enables runner render
   gridRef,          // ref to attach to .game-grid DOM node
+  cellSize = 30,    // px per inner cell
   onInnerClick,     // (row, col) => void
   onBorderClick,    // (row, col) => void
   onBorderRightClick, // (row, col) => void
@@ -208,7 +209,11 @@ export default function GameBoard({
 
   return (
     <div className="grid-wrap">
-      <div className="game-grid" ref={gridRef}>
+      <div
+        className="game-grid"
+        ref={gridRef}
+        style={{ '--cell': `${cellSize}px`, '--bcell': `${cellSize * 2}px` }}
+      >
         <div className="grid-scan" />
         {CELLS.map((cell) => {
           const text = getCellText(cell);

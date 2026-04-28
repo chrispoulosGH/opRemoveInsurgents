@@ -9,6 +9,10 @@ export default function Lobby({ onJoin, connecting, error, initialName = '' }) {
     if (name.trim()) onJoin(name.trim());
   };
 
+  const handleClick = () => {
+    if (name.trim()) onJoin(name.trim());
+  };
+
   return (
     <div className="lobby">
       <div className="lobby-hero">
@@ -108,9 +112,10 @@ export default function Lobby({ onJoin, connecting, error, initialName = '' }) {
           </div>
 
           <button
-            type="submit"
+            type="button"
             className="btn-primary"
             disabled={connecting || !name.trim()}
+            onClick={handleClick}
           >
             {connecting ? '◌ Establishing Link...' : '▶ Deploy Agent'}
           </button>

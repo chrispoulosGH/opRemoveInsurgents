@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { N, NUM_FOXES, traceDrone, calcScore } from '../gameLogic';
-import { playPanicScreams, playDroneDeployed, playTargetLit, playTargetUnlit, playDeployingStrikeForce, playDronesDepleted } from '../audio';
+import { playPanicScreams, playDroneDeployed, playTargetLit, playTargetUnlit, playDeployingStrikeForce, playDronesDepleted, playMaxTargetsLit } from '../audio';
 import HUD from './HUD';
 import GameBoard from './GameBoard';
 import AirStrike from './AirStrike';
@@ -27,6 +27,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
     { ts: timestamp(), msg: 'Awaiting drone deployment orders.', cls: '' },
   ]);
   const [showScore, setShowScore]   = useState(false);
+  const [cellSize, setCellSize]     = useState(30);
   const logEndRef  = useRef(null);
   const gridRef    = useRef(null);   // attached to .game-grid in GameBoard
   const foxKeysRef    = useRef(new Set());   // stable ref for impact callback
@@ -50,6 +51,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
     setSuspected(prev => {
       if (!prev.has(key) && prev.size >= NUM_FOXES) {
         addLog(`TARGET LIMIT REACHED — maximum ${NUM_FOXES} targets allowed.`, 'bad');
+        playMaxTargetsLit();
         return prev;
       }
       const next = new Set(prev);
@@ -302,6 +304,24 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
                   ◈ View Scoreboard
                 </button>
               )}
+              <div className="grid-size-control">
+                <div className="grid-size-label">
+                  <span>Grid Size</span>
+                  <span style={{ color: 'var(--cyan)' }}>{cellSize}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={18}
+                  max={42}
+                  step={1}
+                  value={cellSize}
+                  onChange={e => setCellSize(Number(e.target.value))}
+                  className="grid-size-slider"
+                />
+                <div className="grid-size-hints">
+                  <span>Small</span><span>Large</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -315,7 +335,11 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
               <div className="legend-row"><div className="swatch swatch-path" /> Drone flight path</div>
               {fired && <>
                 <div className="legend-row"><div className="swatch swatch-hit" /> DESTROYED (hit)</div>
-                <div className="legend-row"><div className="swatch swatch-miss" /> Missed cell</div>
+                <div className="legend-row"><div className="swatch swatch-miss" /> Fox not targeted</div>
+                <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', margin: '.3rem 0' }} />
+                <div className="legend-row"><div className="swatch swatch-reveal-hit" /> Cell destroyed</div>
+                <div className="legend-row"><div className="swatch swatch-reveal-esc" /> Terror cell escaped</div>
+                <div className="legend-row"><div className="swatch swatch-reveal-civ" /> Civilian strike</div>
               </>}
             </div>
           </div>
@@ -378,6 +402,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
             airStriking={airStriking}
             runnersActive={runnersActive}
             gridRef={gridRef}
+            cellSize={cellSize}
             onInnerClick={handleInnerClick}
             onBorderClick={handleBorderClick}
             onBorderRightClick={handleBorderRightClick}
@@ -387,6 +412,8 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
             <AirStrike
               targets={strikeCells}
               gridRef={gridRef}
+              cellPx={cellSize}
+              borderPx={cellSize * 2}
               onCellImpact={handleCellImpact}
               onDone={handleAirStrikeDone}
             />

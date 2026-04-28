@@ -2,6 +2,7 @@
   "name": "tc",
   "version": "1.0.0",
   "scripts": {
+    "dev": "powershell -ExecutionPolicy Bypass -File ./start.ps1",
     "build": "cd client && npm install && npm run build",
     "start": "cd server && node index.js"
   },
