@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { N, NUM_FOXES, traceDrone, calcScore } from '../gameLogic';
-import { playPanicScreams, playDroneDeployed, playTargetLit, playTargetUnlit, playDeployingStrikeForce, playDronesDepleted, playMaxTargetsLit } from '../audio';
+import { playPanicScreams, playDroneDeployed, playTargetLit, playTargetUnlit, playDeployingStrikeForce, playDronesDepleted, playMaxTargetsLit, speakReport } from '../audio';
 import HUD from './HUD';
 import GameBoard from './GameBoard';
 import AirStrike from './AirStrike';
@@ -28,10 +28,13 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
   ]);
   const [showScore, setShowScore]   = useState(false);
   const [cellSize, setCellSize]     = useState(30);
+  const [revealTracedKey, setRevealTracedKey] = useState(null);
   const logEndRef  = useRef(null);
   const gridRef    = useRef(null);   // attached to .game-grid in GameBoard
   const foxKeysRef    = useRef(new Set());   // stable ref for impact callback
   const missedRef     = useRef(0);           // missed fox count for done callback
+  const hitsRef       = useRef(0);           // hit count for done callback
+  const falsePosRef   = useRef(0);           // false positive count for done callback
   const screamsFired      = useRef(false);   // ensure screams only start once
   const runnersScheduled  = useRef(false);   // ensure runner delay only fires once
   const totalTargetsRef   = useRef(0);       // total missile targets for this strike
@@ -129,6 +132,37 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
     addLog(`SIM: ${result.label} test-path rendered (using your marks)`, 'info');
   }, [fired, previews, launches, suspected, addLog]);
 
+  const handleInnerRightClick = useCallback((row, col) => {
+    if (!fired) return;
+    const foxKeys = new Set(foxes.map(([r, c]) => `${r},${c}`));
+    const key = `${row},${col}`;
+    if (!foxKeys.has(key)) return; // only red/green (fox) cells
+
+    // Toggle: right-clicking the same cell again clears traces
+    if (revealTracedKey === key) {
+      setPreviews(new Map());
+      setRevealTracedKey(null);
+      addLog(`Deflection traces cleared for (${row},${col})`, '');
+      return;
+    }
+
+    // Trace from all 4 aligned border entry points using actual fox positions
+    const entries = [
+      [-1, col],   // north border
+      [N,  col],   // south border
+      [row, -1],   // west border
+      [row, N],    // east border
+    ];
+    const newPreviews = new Map();
+    for (const [er, ec] of entries) {
+      const result = traceDrone(er, ec, foxes);
+      newPreviews.set(`${er},${ec}`, result);
+    }
+    setPreviews(newPreviews);
+    setRevealTracedKey(key);
+    addLog(`Deflection traces shown for fox at (${row},${col}) — right-click again to clear`, 'info');
+  }, [fired, foxes, revealTracedKey, addLog]);
+
   const handleFire = useCallback(async () => {
     if (fired || suspected.size === 0) return;
 
@@ -151,6 +185,8 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
     });
 
     missedRef.current        = misses;
+    hitsRef.current          = hitCount;
+    falsePosRef.current      = fpCount;
     screamsFired.current     = false;
     runnersScheduled.current = false;
     totalTargetsRef.current  = cells.length;
@@ -199,7 +235,19 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
     setAirStriking(false);
     setStrikeReveal(null);
     // Banner appears after runners have had time to flee (max 8s run duration)
-    setTimeout(() => setBannerVisible(true), 8500);
+    setTimeout(() => {
+      setBannerVisible(true);
+      const h  = hitsRef.current;
+      const m  = missedRef.current;
+      const fp = falsePosRef.current;
+      const parts = [];
+      if (m === 0) parts.push('Mission accomplished.');
+      else         parts.push('Mission failed.');
+      if (h > 0)  parts.push(`${h} terror cell${h !== 1 ? 's' : ''} destroyed.`);
+      if (m > 0)  parts.push(`${m} terror cell${m !== 1 ? 's' : ''} escaped.`);
+      if (fp > 0) parts.push(`${fp} civilian location${fp !== 1 ? 's' : ''} destroyed.`);
+      speakReport(parts.join(' '));
+    }, 8500);
   }, []);
 
   const handleClearPaths = useCallback(() => {
@@ -266,6 +314,26 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
               <div className="intel-row">
                 <span className="intel-key">Final Score</span>
                 <span className="intel-val green">{calcScore(hits, droneCnt)}</span>
+              </div>
+            )}
+            {fired && (
+              <div className="score-formula">
+                <div className="score-formula-row">
+                  <div className="score-term">
+                    <span className="score-val green">10 × {hits}</span>
+                    <span className="score-lbl">hits</span>
+                  </div>
+                  <span className="score-op">+</span>
+                  <div className="score-term">
+                    <span className="score-val cyan">({N} − {droneCnt})</span>
+                    <span className="score-lbl">grid − drones</span>
+                  </div>
+                  <span className="score-op">=</span>
+                  <div className="score-term">
+                    <span className="score-val green">{calcScore(hits, droneCnt)}</span>
+                    <span className="score-lbl">score</span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -404,6 +472,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
             gridRef={gridRef}
             cellSize={cellSize}
             onInnerClick={handleInnerClick}
+            onInnerRightClick={handleInnerRightClick}
             onBorderClick={handleBorderClick}
             onBorderRightClick={handleBorderRightClick}
           />

@@ -46,49 +46,32 @@ export function playMissileLaunch() {
   }
 }
 
-/**
- * Cache voices as soon as the browser has them.
- * getVoices() returns [] on first call — voiceschanged fires once they load.
- */
+// ── Web Speech API voice ──────────────────────────────────────────────────────
+
 let cachedVoices = [];
-function loadVoices() {
-  cachedVoices = window.speechSynthesis.getVoices();
-}
+function loadVoices() { cachedVoices = window.speechSynthesis.getVoices(); }
 loadVoices();
 if (typeof window !== 'undefined') {
   window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
 }
 
-function pickFemaleVoice() {
-  return cachedVoices.find(v =>
-    /female|woman|zira|samantha|karen|victoria|moira|fiona|veena|susan|heather|allison/i.test(v.name)
-  ) ?? null;
-}
-
-/**
- * Shared helper — speak text in a female voice.
- * Returns a Promise that resolves when the utterance finishes (or on error).
- * Falls back to a timed resolve so a silent browser never hangs the caller.
- */
 function speakFemale(text) {
   return new Promise(resolve => {
     let done = false;
     const finish = () => { if (!done) { done = true; resolve(); } };
-
     try {
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.rate   = 1.05;
-      utter.pitch  = 1.6;
+      const utter  = new SpeechSynthesisUtterance(text);
+      utter.rate   = 0.92;
+      utter.pitch  = 0.88;
       utter.volume = 0.9;
-      const female = pickFemaleVoice();
+      const female = cachedVoices.find(v =>
+        /female|woman|zira|samantha|karen|victoria|moira|fiona|veena|susan|heather|allison/i.test(v.name)
+      ) ?? null;
       if (female) utter.voice = female;
       utter.onend   = finish;
       utter.onerror = finish;
       window.speechSynthesis.speak(utter);
-      // Safety net: resolve after estimated duration + 600ms buffer
-      // so a browser that never fires onend doesn't block the game.
-      const fallbackMs = Math.max(2000, text.length * 75 + 600);
-      setTimeout(finish, fallbackMs);
+      setTimeout(finish, Math.max(2000, text.length * 75 + 600));
     } catch (e) {
       console.warn('Speech failed:', e);
       finish();
@@ -129,6 +112,10 @@ export function playDronesDepleted() {
 
 export function playMaxTargetsLit() {
   speakFemale('Maximum number of targets are lit');
+}
+
+export function speakReport(text) {
+  speakFemale(text);
 }
 
 /**

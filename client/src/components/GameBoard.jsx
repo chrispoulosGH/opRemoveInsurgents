@@ -37,6 +37,7 @@ export default function GameBoard({
   gridRef,          // ref to attach to .game-grid DOM node
   cellSize = 30,    // px per inner cell
   onInnerClick,     // (row, col) => void
+  onInnerRightClick, // (row, col) => void — post-reveal fox trace
   onBorderClick,    // (row, col) => void
   onBorderRightClick, // (row, col) => void
 }) {
@@ -228,6 +229,7 @@ export default function GameBoard({
               onContextMenu={(e) => {
                 e.preventDefault();
                 if (cell.border) onBorderRightClick(cell.row, cell.col);
+                else if (cell.inner && fired) onInnerRightClick?.(cell.row, cell.col);
               }}
               onMouseEnter={() => {
                 if (cell.border && pairMap.has(cell.key)) setHoveredKey(cell.key);

@@ -167,11 +167,13 @@ export default function AirStrike({ targets, gridRef, cellPx = CELL_PX_DEFAULT, 
       y: topY + i * JET_GAP, x: -72, facingRight: true,
     }));
 
-    // missiles — one per target, assigned to jets round-robin
+    // missiles — one per target, each fired from the jet closest in vertical position
     const missiles = targets.map((t, i) => {
-      const jet = jets[i % JET_COUNT];
       const tx  = rect.left + borderPx + t.col * cellPx + cellPx / 2;
       const ty  = rect.top  + borderPx + t.row * cellPx + cellPx / 2;
+      const jet = jets.reduce((best, j) =>
+        Math.abs(j.y - ty) < Math.abs(best.y - ty) ? j : best
+      );
       const dx  = tx - destX;
       const dy  = ty - jet.y;
       return {
