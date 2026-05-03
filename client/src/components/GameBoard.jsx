@@ -40,7 +40,10 @@ export default function GameBoard({
   onInnerRightClick, // (row, col) => void — post-reveal fox trace
   onBorderClick,    // (row, col) => void
   onBorderRightClick, // (row, col) => void
+  missionNumber = 1,
 }) {
+  const MAP_IMAGES = { 1: '/iran_3.png', 2: '/tanzier_1.png', 3: '/doha_1.png' };
+  const mapImage = MAP_IMAGES[missionNumber] ?? '/iran_3.png';
   const [hoveredKey, setHoveredKey] = useState(null);
   const [crossHover, setCrossHover] = useState(null); // { row, col }
 
@@ -213,7 +216,7 @@ export default function GameBoard({
       <div
         className="game-grid"
         ref={gridRef}
-        style={{ '--cell': `${cellSize}px`, '--bcell': `${cellSize * 2}px` }}
+        style={{ '--cell': `${cellSize}px`, '--bcell': `${cellSize * 2}px`, backgroundImage: `url('${mapImage}')` }}
       >
         <div className="grid-scan" />
         {CELLS.map((cell) => {

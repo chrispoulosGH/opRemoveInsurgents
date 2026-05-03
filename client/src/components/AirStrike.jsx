@@ -5,16 +5,16 @@ import { playMissileLaunch } from '../audio';
 const SFX = ['/sfx/jet-engine.mp3', '/sfx/blast1.mp3'];
 SFX.forEach(src => { const a = new Audio(src); a.preload = 'auto'; a.load(); });
 
-const CELL_PX_DEFAULT   = 30;
-const BORDER_PX_DEFAULT = 60;
-const JET_COUNT   = 10;
-const JET_GAP     = 38;    // px between jets vertically
-const FLY_IN_DUR  = 5.4;   // seconds for jets to reach grid edge
-const PAUSE_DUR   = 0.35;  // seconds jets hover before firing
-const STAGGER     = 0;     // seconds between successive missile launches
-const SPEED       = 450;   // missile px / second
-const POST_PAUSE  = 0.7;   // seconds after last impact before jets leave
-const FLY_OUT_DUR = 3.6;   // seconds for jets to exit left
+const CELL_PX_DEFAULT    = 30;
+const BORDER_PX_DEFAULT  = 60;
+const JET_COUNT          = 20;
+const JET_GAP            = 28;    // px between jets vertically
+const FLY_IN_DUR         = 5.4;   // seconds for jets to reach grid edge
+const PAUSE_DUR          = 0.35;  // seconds jets hover before firing
+const SPEED              = 450;   // missile px / second
+const POST_PAUSE         = 0.7;   // seconds after last impact before jets leave
+const INTER_ROUND_PAUSE  = 0.9;   // seconds between rounds
+const FLY_OUT_DUR        = 3.6;   // seconds for jets to exit left
 
 // ── audio helpers ─────────────────────────────────────────────────────────────
 
@@ -167,29 +167,41 @@ export default function AirStrike({ targets, gridRef, cellPx = CELL_PX_DEFAULT, 
       y: topY + i * JET_GAP, x: -72, facingRight: true,
     }));
 
-    // missiles — one per target, each fired from the jet closest in vertical position
-    const missiles = targets.map((t, i) => {
-      const tx  = rect.left + borderPx + t.col * cellPx + cellPx / 2;
-      const ty  = rect.top  + borderPx + t.row * cellPx + cellPx / 2;
-      const jet = jets.reduce((best, j) =>
-        Math.abs(j.y - ty) < Math.abs(best.y - ty) ? j : best
-      );
-      const dx  = tx - destX;
-      const dy  = ty - jet.y;
-      return {
-        sx: destX, sy: jet.y, tx, ty,
-        x: destX,  y: jet.y,
-        angle:    Math.atan2(dy, dx),
-        dur:      Math.hypot(dx, dy) / SPEED,
-        launchAt: FLY_IN_DUR + PAUSE_DUR + i * STAGGER,
-        active: false, impacted: false,
-        flashAlpha: 0,
-        key: `${t.row},${t.col}`,
-      };
-    });
+    // Split targets into rounds of JET_COUNT; build missiles with even jet assignment
+    const missiles = [];
+    let roundStart = FLY_IN_DUR + PAUSE_DUR;
 
-    const last      = missiles[missiles.length - 1];
-    const flyOutAt  = last.launchAt + last.dur + POST_PAUSE;
+    for (let r = 0; r < targets.length; r += JET_COUNT) {
+      const roundTargets = targets.slice(r, r + JET_COUNT);
+      // Sort targets by row for top-to-bottom matching
+      const sorted = [...roundTargets].sort((a, b) => a.row - b.row);
+      const M = sorted.length;
+      let maxDur = 0;
+      // All JET_COUNT jets fire; distribute evenly across M targets
+      for (let i = 0; i < JET_COUNT; i++) {
+        const t   = sorted[Math.floor(i * M / JET_COUNT)];
+        const jet = jets[i];
+        const tx  = rect.left + borderPx + t.col * cellPx + cellPx / 2;
+        const ty  = rect.top  + borderPx + t.row * cellPx + cellPx / 2;
+        const dx  = tx - destX;
+        const dy  = ty - jet.y;
+        const dur = Math.hypot(dx, dy) / SPEED;
+        maxDur = Math.max(maxDur, dur);
+        missiles.push({
+          sx: destX, sy: jet.y, tx, ty,
+          x: destX,  y: jet.y,
+          angle:    Math.atan2(dy, dx),
+          dur,
+          launchAt: roundStart,
+          active: false, impacted: false,
+          flashAlpha: 0,
+          key: `${t.row},${t.col}`,
+        });
+      }
+      roundStart += maxDur + INTER_ROUND_PAUSE;
+    }
+
+    const flyOutAt = roundStart - INTER_ROUND_PAUSE + POST_PAUSE;
 
     // ── schedule audio ──────────────────────────────────────────────────────
     // Jet engine: starts immediately, loops for the full fly-in duration
@@ -201,9 +213,10 @@ export default function AirStrike({ targets, gridRef, cellPx = CELL_PX_DEFAULT, 
     const engineStopMs = (flyOutAt + FLY_OUT_DUR + 0.3) * 1000;
     const engineTimer  = setTimeout(() => { jetAudio.pause(); }, engineStopMs);
 
-    // Missile launches: staggered, one sound per missile
-    const launchTimers = missiles.map(m =>
-      setTimeout(() => playMissileLaunch(), m.launchAt * 1000)
+    // One launch sound per round (all missiles in a round fire simultaneously)
+    const roundLaunchTimes = [...new Set(missiles.map(m => m.launchAt))];
+    const launchTimers = roundLaunchTimes.map(lt =>
+      setTimeout(() => playMissileLaunch(), lt * 1000)
     );
 
     const blastAudios = [];  // track blast clips so we can stop them on fly-out

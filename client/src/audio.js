@@ -60,6 +60,7 @@ function speakFemale(text) {
     let done = false;
     const finish = () => { if (!done) { done = true; resolve(); } };
     try {
+      window.speechSynthesis.cancel(); // clear any queued utterances
       const utter  = new SpeechSynthesisUtterance(text);
       utter.rate   = 0.92;
       utter.pitch  = 0.88;

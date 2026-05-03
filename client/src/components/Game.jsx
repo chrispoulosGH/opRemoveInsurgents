@@ -1,16 +1,18 @@
-import { useState, useCallback, useRef } from 'react';
-import { N, NUM_FOXES, traceDrone, calcScore } from '../gameLogic';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { N, traceDrone, calcScore } from '../gameLogic';
 import { playPanicScreams, playDroneDeployed, playTargetLit, playTargetUnlit, playDeployingStrikeForce, playDronesDepleted, playMaxTargetsLit, speakReport } from '../audio';
 import HUD from './HUD';
 import GameBoard from './GameBoard';
 import AirStrike from './AirStrike';
 import Scoreboard from './Scoreboard';
+import MissionBriefing from './MissionBriefing';
 
 function timestamp() {
   return new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-export default function Game({ playerName, mySocketId, foxes, players, gameOver, onSubmitScore, onPlayAgain }) {
+export default function Game({ playerName, mySocketId, foxes, players, gameOver, numFoxes = 9, droneLimit = 25, isContinuation = false, missionNumber = 1, onSubmitScore, onContinueMission, onPlayAgain }) {
+  const [briefing, setBriefing]     = useState(true);
   const [suspected, setSuspected]   = useState(new Set());   // Set<"row,col">
   const [launches, setLaunches]     = useState(new Map());   // Map<"row,col", { label, path, exitRow, exitCol }>
   const [previews, setPreviews]     = useState(new Map());   // Map<entryKey, { label, path, exitRow, exitCol }>
@@ -23,7 +25,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
   const [runnersActive, setRunnersActive] = useState(false);
   const [bannerVisible, setBannerVisible] = useState(false);
   const [log, setLog]               = useState([
-    { ts: timestamp(), msg: `BRIEFING RECEIVED. ${NUM_FOXES} terror cells active in sector.`, cls: 'info' },
+    { ts: timestamp(), msg: `BRIEFING RECEIVED. ${numFoxes} terror cells active in sector.`, cls: 'info' },
     { ts: timestamp(), msg: 'Awaiting drone deployment orders.', cls: '' },
   ]);
   const [showScore, setShowScore]   = useState(false);
@@ -39,6 +41,18 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
   const runnersScheduled  = useRef(false);   // ensure runner delay only fires once
   const totalTargetsRef   = useRef(0);       // total missile targets for this strike
 
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (isContinuation) {
+        speakReport(`Escaped terror cells have reconstituted. ${numFoxes} new terror cells detected in new locations. ${droneLimit} drones available. Commence drone reconnaissance now.`);
+      } else {
+        speakReport(`Intelligence confirms ${numFoxes} active terror cells operating in the sector. Hostile elements are embedded within the civilian population. Civilian casualties are not acceptable. Drone reconnaissance is authorized. Locate and mark all targets for simultaneous elimination. Commence drone reconnaissance now.`);
+      }
+    }, 50);
+    return () => clearTimeout(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const addLog = useCallback((msg, cls = '') => {
     setLog(prev => {
       const next = [...prev, { ts: timestamp(), msg, cls }];
@@ -52,8 +66,8 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
     if (fired) return;
     const key = `${row},${col}`;
     setSuspected(prev => {
-      if (!prev.has(key) && prev.size >= NUM_FOXES) {
-        addLog(`TARGET LIMIT REACHED — maximum ${NUM_FOXES} targets allowed.`, 'bad');
+      if (!prev.has(key) && prev.size >= numFoxes) {
+        addLog(`TARGET LIMIT REACHED — maximum ${numFoxes} targets allowed.`, 'bad');
         playMaxTargetsLit();
         return prev;
       }
@@ -76,7 +90,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
     if (fired) return;
     const key = `${row},${col}`;
     if (launches.has(key)) return;                          // already launched
-    if (launches.size >= N) {
+    if (launches.size >= droneLimit) {
       playDronesDepleted();
       addLog('DRONE LIMIT REACHED — no further launches permitted.', 'bad');
       return;
@@ -99,16 +113,13 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
   // Preview a test path using player's own marks as simulated fox positions.
   // Right-clicking the entry or exit of an existing preview removes it.
   const handleBorderRightClick = useCallback((row, col) => {
-    if (fired) return;
     const key = `${row},${col}`;
 
-    // Check if this key is the entry of any existing preview
+    // Toggle off an existing preview
     if (previews.has(key)) {
       setPreviews(prev => { const next = new Map(prev); next.delete(key); return next; });
       return;
     }
-
-    // Check if this key is the exit of any existing preview
     for (const [entryKey, p] of previews) {
       if (`${p.exitRow},${p.exitCol}` === key) {
         setPreviews(prev => { const next = new Map(prev); next.delete(entryKey); return next; });
@@ -116,21 +127,22 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
       }
     }
 
-    // Only allow simulation from coordinates where a real drone was launched or exited
-    const isLaunchEntry = launches.has(key);
-    const isLaunchExit  = [...launches.values()].some(l => `${l.exitRow},${l.exitCol}` === key);
-    if (!isLaunchEntry && !isLaunchExit) return;
-
-    // Simulate path using the player's suspected positions as the fox field
-    const simTargets = [...suspected].map(k => {
-      const [r, c] = k.split(',').map(Number);
-      return [r, c];
-    });
-
-    const result = traceDrone(row, col, simTargets);
-    setPreviews(prev => new Map(prev).set(key, result));
-    addLog(`SIM: ${result.label} test-path rendered (using your marks)`, 'info');
-  }, [fired, previews, launches, suspected, addLog]);
+    if (!fired) {
+      // Pre-fire: only from real launch entry/exit points, using player's marks
+      const isLaunchEntry = launches.has(key);
+      const isLaunchExit  = [...launches.values()].some(l => `${l.exitRow},${l.exitCol}` === key);
+      if (!isLaunchEntry && !isLaunchExit) return;
+      const simTargets = [...suspected].map(k => { const [r, c] = k.split(',').map(Number); return [r, c]; });
+      const result = traceDrone(row, col, simTargets);
+      setPreviews(prev => new Map(prev).set(key, result));
+      addLog(`SIM: ${result.label} test-path rendered (using your marks)`, 'info');
+    } else {
+      // Post-fire: any border cell, using actual fox positions
+      const result = traceDrone(row, col, foxes);
+      setPreviews(prev => new Map(prev).set(key, result));
+      addLog(`TRACE: ${result.label} actual path revealed`, 'info');
+    }
+  }, [fired, previews, launches, suspected, foxes, addLog]);
 
   const handleInnerRightClick = useCallback((row, col) => {
     if (!fired) return;
@@ -175,9 +187,9 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
     let fpCount = 0;
     for (const key of suspected) { if (!foxKeys.has(key)) fpCount++; }
 
-    const misses   = NUM_FOXES - hitCount;
+    const misses   = numFoxes - hitCount;
     const droneCnt = launches.size;
-    const score    = calcScore(hitCount, droneCnt);
+    const score    = calcScore(hitCount, droneCnt, droneLimit);
 
     const cells = [...suspected].map(k => {
       const [r, c] = k.split(',').map(Number);
@@ -198,8 +210,8 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
     setStrikeReveal(new Set());   // empty Set = progressive mode, no cells revealed yet
     setPreviews(new Map());
     addLog('═══ FIRE MISSION INITIATED ═══', 'warn');
-    addLog(`Cells destroyed: ${hitCount}/${NUM_FOXES}`, hitCount === NUM_FOXES ? 'good' : hitCount >= 5 ? 'info' : 'bad');
-    addLog(`Score: ${score} pts (${hitCount}×10 + ${N - droneCnt} drone bonus)`, 'good');
+    addLog(`Cells destroyed: ${hitCount}/${numFoxes}`, hitCount === numFoxes ? 'good' : hitCount >= 5 ? 'info' : 'bad');
+    addLog(`Score: ${score} pts (${hitCount}×10 + ${droneLimit - droneCnt} drone bonus)`, 'good');
     addLog('Transmitting results to command...', 'info');
     onSubmitScore(hitCount, misses, droneCnt);
 
@@ -240,13 +252,31 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
       const h  = hitsRef.current;
       const m  = missedRef.current;
       const fp = falsePosRef.current;
-      const parts = [];
-      if (m === 0) parts.push('Mission accomplished.');
-      else         parts.push('Mission failed.');
-      if (h > 0)  parts.push(`${h} terror cell${h !== 1 ? 's' : ''} destroyed.`);
-      if (m > 0)  parts.push(`${m} terror cell${m !== 1 ? 's' : ''} escaped.`);
-      if (fp > 0) parts.push(`${fp} civilian location${fp !== 1 ? 's' : ''} destroyed.`);
-      speakReport(parts.join(' '));
+      if (fp > 0) {
+        speakReport('Mission failed. Unacceptable civilian casualties. Return to base.');
+      } else if (m > 0 && missionNumber >= 3) {
+        const tot = totalTargetsRef.current;
+        speakReport(`Mission failed. ${h} terror cell${h !== 1 ? 's' : ''} destroyed. ${m} terror cell${m !== 1 ? 's' : ''} escaped. ${tot} cell${tot !== 1 ? 's' : ''} targeted. Maximum missions reached. Return to base.`);
+      } else {
+        const parts = [];
+        if (m === 0) {
+          parts.push('Mission accomplished.');
+          parts.push(`All ${h} terror cell${h !== 1 ? 's' : ''} neutralized.`);
+          if (missionNumber === 1) {
+            parts.push('Area is clear. Zero threats remaining. Outstanding work, agent. Return to base.');
+          } else if (missionNumber === 2) {
+            parts.push('Sector secured. All remaining hostiles eliminated. Exceptional work, agent. Return to base.');
+          } else {
+            parts.push('Operation complete. All threats eliminated across all sectors. Outstanding work, agent. Return to base.');
+          }
+        } else {
+          parts.push('Mission failed.');
+          if (h > 0) parts.push(`${h} terror cell${h !== 1 ? 's' : ''} destroyed.`);
+          parts.push(`${m} terror cell${m !== 1 ? 's' : ''} escaped.`);
+          parts.push('Proceed to the next mission.');
+        }
+        speakReport(parts.join(' '));
+      }
     }, 8500);
   }, []);
 
@@ -264,7 +294,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
 
   const suspectedCnt = suspected.size;
   const droneCnt = launches.size;
-  const dronesLeft = N - droneCnt;
+  const dronesLeft = droneLimit - droneCnt;
 
   return (
     <div className="game-wrap">
@@ -274,6 +304,8 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
         suspectedCnt={suspectedCnt}
         fired={fired}
         hits={hits}
+        numFoxes={numFoxes}
+        droneLimit={droneLimit}
       />
 
       <div className="game-body">
@@ -288,7 +320,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
             </div>
             <div className="intel-row">
               <span className="intel-key">Terror Cells</span>
-              <span className="intel-val red">{NUM_FOXES}</span>
+              <span className="intel-val red">{numFoxes}</span>
             </div>
             <div className="intel-row">
               <span className="intel-key">Drones Available</span>
@@ -298,22 +330,22 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
             </div>
             <div className="intel-row">
               <span className="intel-key">Targets Marked</span>
-              <span className={`intel-val ${suspectedCnt === NUM_FOXES ? 'green' : ''}`}>
-                {suspectedCnt}/{NUM_FOXES}
+              <span className={`intel-val ${suspectedCnt === numFoxes ? 'green' : ''}`}>
+                {suspectedCnt}/{numFoxes}
               </span>
             </div>
             {fired && (
               <div className="intel-row">
                 <span className="intel-key">Cells Destroyed</span>
-                <span className={`intel-val ${hits === NUM_FOXES ? 'green' : 'orange'}`}>
-                  {hits}/{NUM_FOXES}
+                <span className={`intel-val ${hits === numFoxes ? 'green flash-text-green' : 'orange'}`}>
+                  {hits}/{numFoxes}
                 </span>
               </div>
             )}
             {fired && (
               <div className="intel-row">
                 <span className="intel-key">Final Score</span>
-                <span className="intel-val green">{calcScore(hits, droneCnt)}</span>
+                <span className="intel-val green">{calcScore(hits, droneCnt, droneLimit)}</span>
               </div>
             )}
             {fired && (
@@ -325,12 +357,12 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
                   </div>
                   <span className="score-op">+</span>
                   <div className="score-term">
-                    <span className="score-val cyan">({N} − {droneCnt})</span>
-                    <span className="score-lbl">grid − drones</span>
+                    <span className="score-val cyan">({droneLimit} − {droneCnt})</span>
+                    <span className="score-lbl">limit − drones</span>
                   </div>
                   <span className="score-op">=</span>
                   <div className="score-term">
-                    <span className="score-val green">{calcScore(hits, droneCnt)}</span>
+                    <span className="score-val green">{calcScore(hits, droneCnt, droneLimit)}</span>
                     <span className="score-lbl">score</span>
                   </div>
                 </div>
@@ -429,36 +461,55 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
 
         {/* Game board */}
         <div className="board-area">
-          {bannerVisible && (
-            <div className={`mission-banner ${hits === NUM_FOXES ? 'accomplished' : 'failed'}`}>
-              <div className="mission-title">
-                {hits === NUM_FOXES ? 'MISSION ACCOMPLISHED' : 'MISSION FAILED'}
-              </div>
-              <div className="mission-subtitle">
-                {hits === NUM_FOXES
-                  ? `All terrorists in ${NUM_FOXES} cells terminated`
-                  : `Terrorists escaped from ${NUM_FOXES - hits} cell${NUM_FOXES - hits !== 1 ? 's' : ''}`
-                }
-              </div>
-              {hits < NUM_FOXES && hits > 0 && (
-                <div className="mission-subtitle mission-killed">
-                  {`Terrorists killed in ${hits} cell${hits !== 1 ? 's' : ''}`}
+          {bannerVisible && (() => {
+            const missionFailed  = hits < numFoxes || falsePos > 0;
+            const isGameOver     = falsePos > 0 || (hits < numFoxes && missionNumber >= 3);
+            const isAccomplished = !missionFailed;
+            return (
+              <div className={`mission-banner ${isAccomplished ? 'accomplished' : 'failed'}`}>
+                {isGameOver && (
+                  <div className="mission-title" style={{ fontSize: '2rem', letterSpacing: '.2em', color: 'var(--red)' }}>
+                    GAME OVER
+                  </div>
+                )}
+                <div className="mission-title">
+                  {isAccomplished ? 'MISSION ACCOMPLISHED' : 'MISSION FAILED'}
                 </div>
-              )}
-              {hits < NUM_FOXES && falsePos > 0 && (
-                <div className="mission-subtitle mission-casualties">
-                  {`Civilians killed in ${falsePos} cell${falsePos !== 1 ? 's' : ''}`}
+                <div className="mission-subtitle">
+                  {isAccomplished
+                    ? `All terror cells in ${numFoxes} locations eliminated`
+                    : `Terror cells escaped from ${numFoxes - hits} location${numFoxes - hits !== 1 ? 's' : ''}`
+                  }
                 </div>
-              )}
-              <button
-                className="btn-secondary"
-                style={{ marginTop: '1rem' }}
-                onClick={onPlayAgain}
-              >
-                ↺ Play Again
-              </button>
-            </div>
-          )}
+                {hits > 0 && hits < numFoxes && (
+                  <div className="mission-subtitle mission-killed">
+                    {`${hits} terror cell${hits !== 1 ? 's' : ''} destroyed`}
+                  </div>
+                )}
+                {falsePos > 0 && (
+                  <div className="mission-subtitle mission-casualties">
+                    {`${falsePos} civilian location${falsePos !== 1 ? 's' : ''} destroyed`}
+                  </div>
+                )}
+                {missionFailed && !isGameOver && (
+                  <button
+                    className="btn-fire"
+                    style={{ marginTop: '1rem', width: 'auto', padding: '0 1.5rem' }}
+                    onClick={() => onContinueMission(numFoxes - hits)}
+                  >
+                    ⟩ Continue to Next Mission
+                  </button>
+                )}
+                <button
+                  className="btn-secondary"
+                  style={{ marginTop: '.5rem', width: 'auto', padding: '0 1.5rem' }}
+                  onClick={onPlayAgain}
+                >
+                  ↺ Play Again
+                </button>
+              </div>
+            );
+          })()}
 
           <GameBoard
             foxes={foxes}
@@ -471,6 +522,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
             runnersActive={runnersActive}
             gridRef={gridRef}
             cellSize={cellSize}
+            missionNumber={missionNumber}
             onInnerClick={handleInnerClick}
             onInnerRightClick={handleInnerRightClick}
             onBorderClick={handleBorderClick}
@@ -575,7 +627,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
                 Right-click border to <span style={{ color: 'var(--cyan)' }}>simulate</span> a path using your current marks.
               </div>
               <div style={{ marginTop: '.5rem' }}>
-                Score = <span style={{ color: 'var(--green)' }}>10 × hits</span> + <span style={{ color: 'var(--cyan)' }}>(25 − drones)</span>
+                Score = <span style={{ color: 'var(--green)' }}>10 × hits</span> + <span style={{ color: 'var(--cyan)' }}>({droneLimit} − drones)</span>
               </div>
             </div>
           </div>
@@ -586,7 +638,18 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
         <Scoreboard
           gameOver={gameOver}
           mySocketId={mySocketId}
+          numFoxes={numFoxes}
           onClose={() => setShowScore(false)}
+        />
+      )}
+
+      {briefing && (
+        <MissionBriefing
+          missionNumber={missionNumber}
+          numFoxes={numFoxes}
+          droneLimit={droneLimit}
+          isContinuation={isContinuation}
+          onReady={() => setBriefing(false)}
         />
       )}
     </div>
