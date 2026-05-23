@@ -117,6 +117,6 @@ export function traceDrone(startRow, startCol, targets) {
   };
 }
 
-export function calcScore(hits, droneCnt) {
-  return 10 * hits + (N - droneCnt);
+export function calcScore(hits, droneCnt, droneLimit = N) {
+  return 10 * hits + (droneLimit - droneCnt);
 }

@@ -1,8 +1,6 @@
-import { NUM_FOXES, N } from '../gameLogic';
-
 const MEDALS = ['gold', 'silver', 'bronze'];
 
-export default function Scoreboard({ gameOver, mySocketId, onClose }) {
+export default function Scoreboard({ gameOver, mySocketId, numFoxes, onClose }) {
   const { rankings, foxes } = gameOver;
 
   return (
@@ -27,7 +25,7 @@ export default function Scoreboard({ gameOver, mySocketId, onClose }) {
                 <div className="rank-meta">
                   <span className="rank-score">{player.score}</span>
                   <span className="rank-detail">
-                    {player.hits}/{NUM_FOXES} HIT · {player.droneCnt} DRONES
+                    {player.hits}/{numFoxes} HIT · {player.droneCnt} DRONES
                   </span>
                 </div>
               </li>

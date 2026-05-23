@@ -18,17 +18,37 @@ if (isProd) {
 }
 
 const N = 25;
-const NUM_FOXES = 9;
 
 // Global game state — single shared game
 let foxPositions = [];
+let missionNumFoxes  = 9;   // escalates on continue
+let missionDroneLimit = 25;  // escalates on continue
+let missionNumber = 1;       // 1-based; game over after MAX_MISSIONS failures
+const MAX_MISSIONS = 3;
 let players = new Map(); // socketId → { name, score, hits, droneCnt, submitted }
 let gamePhase = 'lobby'; // 'lobby' | 'playing' | 'finished'
 
-function generateFoxes() {
+// Hostage rescue state (Level 2)
+let hostagePositions   = [];
+let hostageCount       = 2;
+const HOSTAGE_DEVICE_LIMIT = 4;
+let hostageLevel       = 1;
+const MAX_HOSTAGE_MISSIONS = 3;
+let hostagePhase       = 'inactive'; // 'inactive' | 'playing' | 'finished'
+
+function hostageDistance(row, col) {
+  const distances = hostagePositions.map(([hr, hc]) =>
+    Math.round(Math.sqrt((row - hr) ** 2 + (col - hc) ** 2))
+  );
+  let minDist = Infinity, minIdx = 0;
+  distances.forEach((d, i) => { if (d < minDist) { minDist = d; minIdx = i; } });
+  return { distance: minDist, hostageIdx: minIdx, distances };
+}
+
+function generateFoxes(count) {
   const seen = new Set();
   const result = [];
-  while (result.length < NUM_FOXES) {
+  while (result.length < count) {
     const row = Math.floor(Math.random() * N);
     const col = Math.floor(Math.random() * N);
     const key = `${row},${col}`;
@@ -41,7 +61,7 @@ function generateFoxes() {
 }
 
 function calcScore(hits, droneCnt) {
-  return 10 * hits + (N - droneCnt);
+  return 10 * hits + (missionDroneLimit - droneCnt);
 }
 
 function broadcastState() {
@@ -91,11 +111,14 @@ io.on('connection', (socket) => {
       submitted: false
     });
 
-    // Start a new game if none in progress
-    if (gamePhase === 'lobby') {
-      foxPositions = generateFoxes();
+    // Start a fresh game if none in progress (or previous one is finished)
+    if (gamePhase !== 'playing') {
+      missionNumFoxes   = 9;
+      missionDroneLimit = 25;
+      missionNumber     = 1;
+      foxPositions = generateFoxes(missionNumFoxes);
       gamePhase = 'playing';
-      console.log(`[*] New game started — foxes: ${JSON.stringify(foxPositions)}`);
+      console.log(`[*] New game — ${missionNumFoxes} foxes, ${missionDroneLimit} drones`);
     }
 
     console.log(`[+] Player joined: ${cleanName}`);
@@ -104,7 +127,38 @@ io.on('connection', (socket) => {
     socket.emit('game_start', {
       foxes: foxPositions,
       n: N,
-      numFoxes: NUM_FOXES
+      numFoxes: missionNumFoxes,
+      droneLimit: missionDroneLimit,
+      missionNumber,
+      isContinuation: false,
+    });
+  });
+
+  socket.on('continue_mission', ({ escaped }) => {
+    if (gamePhase !== 'finished') return;
+
+    missionNumFoxes   = Math.max(1, escaped * 2);
+    missionDroneLimit = missionNumFoxes * 3;
+    missionNumber++;
+    foxPositions = generateFoxes(missionNumFoxes);
+    gamePhase = 'playing';
+
+    for (const p of players.values()) {
+      p.submitted = false;
+      p.hits      = 0;
+      p.droneCnt  = 0;
+      p.score     = null;
+    }
+
+    console.log(`[*] Mission ${missionNumber} — ${missionNumFoxes} foxes, ${missionDroneLimit} drones`);
+    broadcastState();
+    io.emit('game_start', {
+      foxes: foxPositions,
+      n: N,
+      numFoxes: missionNumFoxes,
+      droneLimit: missionDroneLimit,
+      missionNumber,
+      isContinuation: true,
     });
   });
 
@@ -122,6 +176,50 @@ io.on('connection', (socket) => {
     checkGameOver();
   });
 
+  socket.on('start_hostage_mission', () => {
+    hostageCount    = 2;
+    hostageLevel    = 1;
+    hostagePhase    = 'playing';
+    hostagePositions = generateFoxes(hostageCount);
+    console.log(`[*] Hostage mission L${hostageLevel} — ${hostageCount} hostages`);
+    io.emit('hostage_start', { hostageCount, deviceLimit: HOSTAGE_DEVICE_LIMIT, hostageLevel, isContinuation: false });
+  });
+
+  socket.on('continue_hostage_mission', ({ escaped }) => {
+    if (hostagePhase !== 'finished') return;
+    hostageCount    = Math.min(escaped * 2, 6);
+    hostageLevel++;
+    hostagePhase    = 'playing';
+    hostagePositions = generateFoxes(hostageCount);
+    console.log(`[*] Hostage mission L${hostageLevel} — ${hostageCount} hostages`);
+    io.emit('hostage_start', { hostageCount, deviceLimit: HOSTAGE_DEVICE_LIMIT, hostageLevel, isContinuation: true, escapedCount: escaped });
+  });
+
+  socket.on('place_device', ({ row, col }) => {
+    if (hostagePhase !== 'playing') return;
+    const { distance, hostageIdx, distances } = hostageDistance(row, col);
+    socket.emit('device_result', { row, col, distance, hostageIdx, distances });
+  });
+
+  socket.on('deploy_seals', ({ targets, entries }) => {
+    if (hostagePhase !== 'playing') return;
+    const checks = targets.map((t, i) => ({
+      target: t,
+      entry:  entries[i],
+      correct: hostagePositions.some(([hr, hc]) => Math.abs(t[0]-hr) <= 1 && Math.abs(t[1]-hc) <= 1),
+    }));
+    const rescued = checks.filter(c => c.correct).length;
+    hostagePhase = 'finished';
+    io.emit('seal_result', {
+      checks,
+      rescued,
+      escaped: hostageCount - rescued,
+      hostagePositions,
+      success: rescued === hostageCount,
+      canContinue: hostageLevel < MAX_HOSTAGE_MISSIONS && rescued < hostageCount,
+    });
+  });
+
   socket.on('disconnect', () => {
     const player = players.get(socket.id);
     if (player) {
@@ -130,7 +228,14 @@ io.on('connection', (socket) => {
 
       if (players.size === 0) {
         foxPositions = [];
-        gamePhase = 'lobby';
+        missionNumFoxes   = 9;
+        missionDroneLimit = 25;
+        missionNumber     = 1;
+        gamePhase         = 'lobby';
+        hostagePositions  = [];
+        hostageCount      = 2;
+        hostageLevel      = 1;
+        hostagePhase      = 'inactive';
         console.log('[*] All players gone — resetting');
       } else {
         broadcastState();

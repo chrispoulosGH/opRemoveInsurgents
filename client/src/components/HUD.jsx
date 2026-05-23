@@ -1,9 +1,7 @@
-import { N, NUM_FOXES } from '../gameLogic';
-
-export default function HUD({ playerName, droneCnt, suspectedCnt, fired, hits }) {
-  const dronesLeft = N - droneCnt;
+export default function HUD({ playerName, droneCnt, suspectedCnt, fired, hits, numFoxes = 9, droneLimit = 25 }) {
+  const dronesLeft = droneLimit - droneCnt;
   const droneClass = dronesLeft <= 5 ? 'crit' : dronesLeft <= 10 ? 'warn' : '';
-  const targetClass = suspectedCnt === NUM_FOXES ? 'ok' : suspectedCnt > NUM_FOXES ? 'warn' : '';
+  const targetClass = suspectedCnt === numFoxes ? 'ok' : suspectedCnt > numFoxes ? 'warn' : '';
 
   return (
     <div className="hud">
@@ -28,8 +26,8 @@ export default function HUD({ playerName, droneCnt, suspectedCnt, fired, hits })
         {fired && (
           <div className="hud-stat">
             <span className="hud-stat-label">Cells Destroyed</span>
-            <span className={`hud-stat-value ${hits === NUM_FOXES ? 'ok' : hits >= 6 ? 'warn' : 'crit'}`}>
-              {hits}/{NUM_FOXES}
+            <span className={`hud-stat-value ${hits === numFoxes ? 'ok flash-text-green' : hits >= 6 ? 'warn' : 'crit'}`}>
+              {hits}/{numFoxes}
             </span>
           </div>
         )}

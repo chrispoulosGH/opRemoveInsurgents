@@ -11,7 +11,7 @@ function timestamp() {
   return new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-export default function Game({ playerName, mySocketId, foxes, players, gameOver, numFoxes = 9, droneLimit = 25, isContinuation = false, missionNumber = 1, onSubmitScore, onContinueMission, onPlayAgain }) {
+export default function Game({ playerName, mySocketId, foxes, players, gameOver, numFoxes = 9, droneLimit = 25, isContinuation = false, missionNumber = 1, onSubmitScore, onContinueMission, onPlayAgain, onStartHostageMission }) {
   const [briefing, setBriefing]     = useState(true);
   const [suspected, setSuspected]   = useState(new Set());   // Set<"row,col">
   const [launches, setLaunches]     = useState(new Map());   // Map<"row,col", { label, path, exitRow, exitCol }>
@@ -25,7 +25,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
   const [runnersActive, setRunnersActive] = useState(false);
   const [bannerVisible, setBannerVisible] = useState(false);
   const [log, setLog]               = useState([
-    { ts: timestamp(), msg: `BRIEFING RECEIVED. ${numFoxes} terror cells active in sector.`, cls: 'info' },
+    { ts: timestamp(), msg: `LEVEL 1 — ROUND ${missionNumber} OF 3 — ${numFoxes} terror cells active.`, cls: 'info' },
     { ts: timestamp(), msg: 'Awaiting drone deployment orders.', cls: '' },
   ]);
   const [showScore, setShowScore]   = useState(false);
@@ -136,13 +136,19 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
       const result = traceDrone(row, col, simTargets);
       setPreviews(prev => new Map(prev).set(key, result));
       addLog(`SIM: ${result.label} test-path rendered (using your marks)`, 'info');
+    } else if (bannerVisible) {
+      // Post-game: any border cell, simulated using player's marks
+      const simTargets = [...suspected].map(k => { const [r, c] = k.split(',').map(Number); return [r, c]; });
+      const result = traceDrone(row, col, simTargets);
+      setPreviews(prev => new Map(prev).set(key, result));
+      addLog(`SIM: ${result.label} simulated path (your marks)`, 'info');
     } else {
-      // Post-fire: any border cell, using actual fox positions
+      // Post-fire pre-banner: any border cell, using actual fox positions
       const result = traceDrone(row, col, foxes);
       setPreviews(prev => new Map(prev).set(key, result));
       addLog(`TRACE: ${result.label} actual path revealed`, 'info');
     }
-  }, [fired, previews, launches, suspected, foxes, addLog]);
+  }, [fired, bannerVisible, previews, launches, suspected, foxes, addLog]);
 
   const handleInnerRightClick = useCallback((row, col) => {
     if (!fired) return;
@@ -253,27 +259,20 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
       const m  = missedRef.current;
       const fp = falsePosRef.current;
       if (fp > 0) {
-        speakReport('Mission failed. Unacceptable civilian casualties. Return to base.');
+        speakReport('Mission failed. Unacceptable civilian casualties. Level 1 aborted.');
       } else if (m > 0 && missionNumber >= 3) {
-        const tot = totalTargetsRef.current;
-        speakReport(`Mission failed. ${h} terror cell${h !== 1 ? 's' : ''} destroyed. ${m} terror cell${m !== 1 ? 's' : ''} escaped. ${tot} cell${tot !== 1 ? 's' : ''} targeted. Maximum missions reached. Return to base.`);
+        speakReport(`Level 1 failed. ${m} terror cell${m !== 1 ? 's' : ''} escaped. All rounds exhausted. Operation terminated.`);
       } else {
         const parts = [];
         if (m === 0) {
           parts.push('Mission accomplished.');
           parts.push(`All ${h} terror cell${h !== 1 ? 's' : ''} neutralized.`);
-          if (missionNumber === 1) {
-            parts.push('Area is clear. Zero threats remaining. Outstanding work, agent. Return to base.');
-          } else if (missionNumber === 2) {
-            parts.push('Sector secured. All remaining hostiles eliminated. Exceptional work, agent. Return to base.');
-          } else {
-            parts.push('Operation complete. All threats eliminated across all sectors. Outstanding work, agent. Return to base.');
-          }
+          parts.push('Level 1 complete. Outstanding work, agent. Stand by for Level 2 — Hostage Rescue.');
         } else {
-          parts.push('Mission failed.');
+          parts.push(`Round ${missionNumber} failed.`);
           if (h > 0) parts.push(`${h} terror cell${h !== 1 ? 's' : ''} destroyed.`);
           parts.push(`${m} terror cell${m !== 1 ? 's' : ''} escaped.`);
-          parts.push('Proceed to the next mission.');
+          parts.push(`Proceeding to round ${missionNumber + 1}.`);
         }
         speakReport(parts.join(' '));
       }
@@ -467,18 +466,19 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
             const isAccomplished = !missionFailed;
             return (
               <div className={`mission-banner ${isAccomplished ? 'accomplished' : 'failed'}`}>
-                {isGameOver && (
-                  <div className="mission-title" style={{ fontSize: '2rem', letterSpacing: '.2em', color: 'var(--red)' }}>
-                    GAME OVER
-                  </div>
-                )}
                 <div className="mission-title">
-                  {isAccomplished ? 'MISSION ACCOMPLISHED' : 'MISSION FAILED'}
+                  {isAccomplished
+                    ? 'LEVEL 1 COMPLETE'
+                    : isGameOver
+                      ? 'LEVEL 1 FAILED'
+                      : `ROUND ${missionNumber} FAILED`}
                 </div>
                 <div className="mission-subtitle">
                   {isAccomplished
-                    ? `All terror cells in ${numFoxes} locations eliminated`
-                    : `Terror cells escaped from ${numFoxes - hits} location${numFoxes - hits !== 1 ? 's' : ''}`
+                    ? `All ${numFoxes} terror cell${numFoxes !== 1 ? 's' : ''} eliminated — proceed to Level 2`
+                    : isGameOver
+                      ? `${numFoxes - hits} terror cell${numFoxes - hits !== 1 ? 's' : ''} escaped — all rounds exhausted`
+                      : `${numFoxes - hits} terror cell${numFoxes - hits !== 1 ? 's' : ''} escaped — round ${missionNumber + 1} of 3 incoming`
                   }
                 </div>
                 {hits > 0 && hits < numFoxes && (
@@ -491,13 +491,22 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
                     {`${falsePos} civilian location${falsePos !== 1 ? 's' : ''} destroyed`}
                   </div>
                 )}
+                {isAccomplished && onStartHostageMission && (
+                  <button
+                    className="btn-fire"
+                    style={{ marginTop: '1rem', width: 'auto', padding: '0 1.5rem', background: 'var(--purple)' }}
+                    onClick={onStartHostageMission}
+                  >
+                    ▶ Proceed to Level 2 — Hostage Rescue
+                  </button>
+                )}
                 {missionFailed && !isGameOver && (
                   <button
                     className="btn-fire"
                     style={{ marginTop: '1rem', width: 'auto', padding: '0 1.5rem' }}
                     onClick={() => onContinueMission(numFoxes - hits)}
                   >
-                    ⟩ Continue to Next Mission
+                    ⟩ Continue — Round {missionNumber + 1} of 3
                   </button>
                 )}
                 <button

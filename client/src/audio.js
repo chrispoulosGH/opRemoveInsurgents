@@ -126,6 +126,17 @@ export function playDeployingStrikeForce() {
   return speakFemale('Deploying strike force');
 }
 
+/**
+ * Play real gunfire audio — heavy machine gun burst layered with AR-15 fire.
+ * Files served from /public/sfx/.
+ */
+export function playGunfire() {
+  // Main burst: heavy machine gun (~3.3 s)
+  playClip('/sfx/gunfire_mg.mp3',   { volume: 0.55 });
+  // Secondary layer: AR-15 rapid fire (~4.6 s), slight delay for realism
+  setTimeout(() => playClip('/sfx/gunfire_ar15.mp3', { volume: 0.35 }), 180);
+}
+
 // Real scream clips served from /public/sfx/
 const SCREAM_URLS = [
   '/sfx/scream1.mp3',   // man screaming
@@ -149,6 +160,51 @@ function playClip(url, { rate = 1, volume = 0.25 } = {}) {
   } catch (e) {
     console.warn('Audio playback failed:', e);
   }
+}
+
+function speakArabic(text, delayMs = 0) {
+  setTimeout(() => {
+    try {
+      const utter   = new SpeechSynthesisUtterance(text);
+      utter.lang    = 'ar-SA';
+      utter.rate    = 0.82 + Math.random() * 0.3;
+      utter.pitch   = 0.55 + Math.random() * 0.25;
+      utter.volume  = 0.9;
+      const arVoice = cachedVoices.find(v => /^ar/i.test(v.lang)) ?? null;
+      if (arVoice) utter.voice = arVoice;
+      window.speechSynthesis.speak(utter);
+    } catch (e) { /* silent */ }
+  }, delayMs);
+}
+
+/**
+ * Firefight chaos for Level 2 — screams, Allahu Akbar yells, and Bismillah cries
+ * layered across the firefight duration.
+ */
+export function playFirefightChaos(durationMs = 4000) {
+  // Screams delayed 2 s after attack starts, then staggered
+  [0, 0.35, 0.85, 1.5, 2.2, 3.0].forEach(offset => {
+    const t = 2.0 + offset;
+    if (t * 1000 >= durationMs) return;
+    setTimeout(() => {
+      const url = SCREAM_URLS[Math.floor(Math.random() * SCREAM_URLS.length)];
+      playClip(url, { rate: 0.75 + Math.random() * 0.4, volume: 0.22 + Math.random() * 0.13 });
+    }, t * 1000);
+  });
+
+  // Allahu Akbar clips — all delayed 2 s
+  [0.15, 1.1, 2.6].forEach(offset => {
+    const t = 2.0 + offset;
+    if (t * 1000 >= durationMs) return;
+    setTimeout(() => {
+      const url = ALLAHU_URLS[Math.floor(Math.random() * ALLAHU_URLS.length)];
+      playClip(url, { rate: 0.95 + Math.random() * 0.15, volume: 0.38 });
+    }, t * 1000);
+  });
+
+  // Allahu Akbar speech — delayed 2 s
+  speakArabic('الله أكبر', 2000);
+  speakArabic('الله أكبر', 3800);
 }
 
 /**

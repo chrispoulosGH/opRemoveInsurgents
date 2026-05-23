@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function Lobby({ onJoin, connecting, error, initialName = '' }) {
+export default function Lobby({ onJoin, connecting, error, initialName = '', onTestHostage, onTestLevel3 }) {
   const [name, setName] = useState(initialName);
   const [showBriefing, setShowBriefing] = useState(false);
 
@@ -40,7 +40,7 @@ export default function Lobby({ onJoin, connecting, error, initialName = '' }) {
                   <p>
                     Intelligence confirms <strong>9 active terror cells</strong> embedded within a classified
                     urban grid sector. Cells are dispersed throughout the civilian population, making
-                    conventional ground operations infeasible. Collateral damage is not acceptable.
+                    conventional ground operations infeasible. Civilian casualties are not acceptable.
                     Rival operatives are racing to neutralise the same targets — speed and precision are critical.
                   </p>
                 </div>
@@ -64,20 +64,46 @@ export default function Lobby({ onJoin, connecting, error, initialName = '' }) {
                   </p>
                 </div>
                 <div className="briefing-section">
+                  <div className="briefing-label">MISSION STRUCTURE — 3 SECTORS</div>
+                  <p>
+                    This operation spans <strong>up to 3 sectors</strong> across different theatres. Each sector
+                    presents a new grid with cells relocated to unknown positions.
+                  </p>
+                  <ul className="briefing-list">
+                    <li><strong>Sector 1 — Tehran:</strong> 9 cells. Initial insertion. Establish your methodology.</li>
+                    <li><strong>Sector 2 — Tangier:</strong> Activated only if cells escape Sector 1.</li>
+                    <li><strong>Sector 3 — Doha:</strong> Final engagement. No further chances after this.</li>
+                  </ul>
+                </div>
+                <div className="briefing-section">
+                  <div className="briefing-label">CELL ESCAPE &amp; RECONSTITUTION</div>
+                  <p>
+                    Any terror cell that evades the air strike does not simply flee — it <strong>splits and
+                    reconstitutes</strong>. Each escaped cell regroups with surviving elements and spawns
+                    additional operatives in the next sector. The number of targets in each follow-on mission
+                    is <strong>double the number of cells that escaped</strong> the previous strike.
+                  </p>
+                  <p>
+                    A single escape in Sector 1 becomes two targets in Sector 2. Precision is not optional —
+                    every miss compounds the threat.
+                  </p>
+                </div>
+                <div className="briefing-section">
                   <div className="briefing-label">RULES OF ENGAGEMENT</div>
                   <ul className="briefing-list">
-                    <li>All <strong>9 terror cells</strong> must be marked and destroyed to complete the mission.</li>
-                    <li>Striking a cell with no confirmed hostile presence constitutes a <strong>civilian incident</strong>.</li>
-                    <li>Any cell left unmarked allows insurgents to <strong>escape and regroup</strong> elsewhere
-                        in the city — mission failure.</li>
+                    <li>All active terror cells must be <strong>marked and destroyed</strong> to complete the sector.</li>
+                    <li>Striking a cell with no confirmed hostile presence constitutes a <strong>civilian incident</strong> — immediate mission failure.</li>
+                    <li>Any unmarked cell escapes to the next sector and <strong>reconstitutes as two cells</strong>.</li>
+                    <li>After <strong>3 failed sectors</strong> the operation is terminated. Return to base.</li>
                     <li>Fewer drone deployments yield a higher mission score.</li>
                   </ul>
                 </div>
                 <div className="briefing-section">
                   <div className="briefing-label">OBJECTIVE</div>
                   <p>
-                    Locate all 9 cells. Mark them. Eliminate them simultaneously with a precision air strike.
-                    Zero escapes. Zero civilian casualties. <strong>Mission accomplished.</strong>
+                    Locate all cells. Mark them. Eliminate them simultaneously with a precision air strike.
+                    Zero escapes. Zero civilian casualties. Across all three sectors.{' '}
+                    <strong>Operation complete.</strong>
                   </p>
                 </div>
               </div>
@@ -128,6 +154,27 @@ export default function Lobby({ onJoin, connecting, error, initialName = '' }) {
         >
           ◈ Read Mission Briefing
         </button>
+
+        {onTestHostage && (
+          <button
+            className="btn-secondary"
+            style={{ marginTop: '.5rem', width: '100%', borderColor: 'rgba(168,85,247,.4)', color: 'var(--purple)' }}
+            disabled={connecting}
+            onClick={onTestHostage}
+          >
+            ⚗ Dev: Test Level 2 — Hostage Rescue
+          </button>
+        )}
+        {onTestLevel3 && (
+          <button
+            className="btn-secondary"
+            style={{ marginTop: '.5rem', width: '100%', borderColor: 'rgba(0,212,255,.4)', color: 'var(--cyan)' }}
+            disabled={connecting}
+            onClick={onTestLevel3}
+          >
+            ⚗ Dev: Test Level 3 — Direct Action
+          </button>
+        )}
       </div>
 
       <div className="lobby-footer">
