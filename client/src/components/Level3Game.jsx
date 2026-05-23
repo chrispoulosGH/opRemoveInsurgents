@@ -796,6 +796,21 @@ export default function Level3Game({ playerName, onPlayAgain }) {
 
     viewer.scene.globe.depthTestAgainstTerrain = true;
 
+    // Prevent camera from going below terrain — valley floor ~600–800 m, ridges ~1 200 m.
+    // Clamp at 1 500 m above ellipsoid: keeps camera 500–900 m above targets, stops terrain clipping.
+    const MIN_CAM_HEIGHT = 1500;
+    viewer.scene.screenSpaceCameraController.minimumZoomDistance = MIN_CAM_HEIGHT;
+    const onPostUpdate = () => {
+      if (viewer.isDestroyed()) return;
+      const h = viewer.camera.positionCartographic.height;
+      if (h < MIN_CAM_HEIGHT) {
+        const c = viewer.camera.positionCartographic.clone();
+        c.height = MIN_CAM_HEIGHT;
+        viewer.camera.setView({ destination: C.Cartographic.toCartesian(c) });
+      }
+    };
+    viewer.scene.postUpdate.addEventListener(onPostUpdate);
+
     // Camera offset south so AO centre sits in the middle of the screen at -25° pitch.
     viewer.camera.flyTo({
       destination:  C.Cartesian3.fromDegrees(CENTER_LON, CENTER_LAT - 0.068, INIT_ALT),
@@ -958,6 +973,7 @@ export default function Level3Game({ playerName, onPlayAgain }) {
     viewerRef.current = viewer;
 
     return () => {
+      viewer.scene.postUpdate.removeEventListener(onPostUpdate);
       handler.destroy();
       if (!viewer.isDestroyed()) viewer.destroy();
     };
