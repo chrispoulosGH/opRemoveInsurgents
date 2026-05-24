@@ -693,7 +693,7 @@ function CountdownClock({ onExpire, onMinute, active }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function Level3Game({ playerName, onPlayAgain }) {
+export default function Level3Game({ playerName, onPlayAgain, onMissionComplete }) {
   const containerRef       = useRef(null);
   const viewerRef          = useRef(null);
   const targetRef          = useRef(null);   // { entity, lat, lon, groundAlt }
@@ -1018,7 +1018,7 @@ export default function Level3Game({ playerName, onPlayAgain }) {
           setTimeout(() => speakReport('Direct hit. Target destroyed.'), 15000);
           const allDestroyed = destroyedRef.current.size === TARGETS.length;
           if (allDestroyed) {
-            setTimeout(() => setMissionAccomplished(true), 6200);
+            setTimeout(() => { setMissionAccomplished(true); onMissionComplete?.(); }, 6200);
             setTimeout(() => triggerFlyby(viewerRef.current, () => setShowFlyby(true)), 7500);
           }
         } else {
@@ -1309,7 +1309,7 @@ export default function Level3Game({ playerName, onPlayAgain }) {
           </div>
 
           <button className="btn-secondary" style={{ marginTop: 'auto' }} onClick={onPlayAgain}>
-            ↺ Return to Lobby
+            ← Return to Missions
           </button>
         </div>
 
@@ -1374,7 +1374,7 @@ export default function Level3Game({ playerName, onPlayAgain }) {
                 style={{ marginTop: '2rem', color: 'var(--cyan)', borderColor: 'rgba(0,212,255,.4)' }}
                 onClick={onPlayAgain}
               >
-                ↺ Return to Lobby
+                ← Return to Missions
               </button>
             </div>
           )}

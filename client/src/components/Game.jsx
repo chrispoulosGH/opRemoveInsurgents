@@ -11,7 +11,7 @@ function timestamp() {
   return new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-export default function Game({ playerName, mySocketId, foxes, players, gameOver, numFoxes = 9, droneLimit = 25, isContinuation = false, missionNumber = 1, onSubmitScore, onContinueMission, onPlayAgain, onStartHostageMission }) {
+export default function Game({ playerName, mySocketId, foxes, players, gameOver, numFoxes = 9, droneLimit = 25, isContinuation = false, missionNumber = 1, onSubmitScore, onContinueMission, onPlayAgain, onStartHostageMission, onMissionComplete }) {
   const [briefing, setBriefing]     = useState(true);
   const [suspected, setSuspected]   = useState(new Set());   // Set<"row,col">
   const [launches, setLaunches]     = useState(new Map());   // Map<"row,col", { label, path, exitRow, exitCol }>
@@ -19,6 +19,11 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
   const [fired, setFired]           = useState(false);
   const [hits, setHits]             = useState(0);
   const [falsePos, setFalsePos]     = useState(0);
+
+  // Notify parent when mission succeeds (all targets hit, no civilian casualties)
+  useEffect(() => {
+    if (gameOver && hits >= numFoxes && falsePos === 0) onMissionComplete?.();
+  }, [gameOver]); // eslint-disable-line react-hooks/exhaustive-deps
   const [airStriking, setAirStriking] = useState(false);
   const [strikeReveal, setStrikeReveal] = useState(null); // Set<key> | null
   const [strikeCells, setStrikeCells]   = useState([]);   // [{row,col}] for AirStrike
@@ -475,7 +480,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
                 </div>
                 <div className="mission-subtitle">
                   {isAccomplished
-                    ? `All ${numFoxes} terror cell${numFoxes !== 1 ? 's' : ''} eliminated — proceed to Level 2`
+                    ? `All ${numFoxes} terror cell${numFoxes !== 1 ? 's' : ''} eliminated`
                     : isGameOver
                       ? `${numFoxes - hits} terror cell${numFoxes - hits !== 1 ? 's' : ''} escaped — all rounds exhausted`
                       : `${numFoxes - hits} terror cell${numFoxes - hits !== 1 ? 's' : ''} escaped — round ${missionNumber + 1} of 3 incoming`
@@ -514,7 +519,7 @@ export default function Game({ playerName, mySocketId, foxes, players, gameOver,
                   style={{ marginTop: '.5rem', width: 'auto', padding: '0 1.5rem' }}
                   onClick={onPlayAgain}
                 >
-                  ↺ Play Again
+                  ← Return to Missions
                 </button>
               </div>
             );

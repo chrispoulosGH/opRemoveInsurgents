@@ -1,9 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Lobby from './components/Lobby';
+import MissionSelect from './components/MissionSelect';
 import Game from './components/Game';
 import HostageGame from './components/HostageGame';
 import Level3Game from './components/Level3Game';
 import socket from './socket';
+
+function loadCompleted() {
+  try { return new Set(JSON.parse(localStorage.getItem('tc_completed_missions') || '[]')); }
+  catch { return new Set(); }
+}
 
 export default function App() {
   const [phase, setPhase]           = useState('lobby');
@@ -17,10 +23,21 @@ export default function App() {
   const [droneLimit, setDroneLimit] = useState(25);
   const [isContinuation, setIsContinuation] = useState(false);
   const [missionNumber, setMissionNumber]   = useState(1);
-  const [missionId, setMissionId]   = useState(0); // increments to force Game remount
-  const [hostageData, setHostageData] = useState(null); // { hostageCount, deviceLimit, hostageLevel, isContinuation }
-  const [hostageId, setHostageId]     = useState(0);    // increments to force HostageGame remount
-  const pendingHostageTest            = useRef(false);
+  const [missionId, setMissionId]   = useState(0);
+  const [hostageData, setHostageData] = useState(null);
+  const [hostageId, setHostageId]     = useState(0);
+  const [completedMissions, setCompletedMissions] = useState(loadCompleted);
+  const pendingHostageMission = useRef(false);
+  const rawNameRef            = useRef('');
+
+  const markComplete = useCallback((id) => {
+    setCompletedMissions(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      try { localStorage.setItem('tc_completed_missions', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     socket.on('connect', () => {
@@ -29,18 +46,18 @@ export default function App() {
     });
 
     socket.on('connect_error', () => {
-      setPhase('lobby');
+      setPhase('mission-select');
       setError('Cannot reach server. Is it running on port 3001?');
     });
 
     socket.on('join_error', (msg) => {
-      setPhase('lobby');
+      setPhase('mission-select');
       setError(msg);
     });
 
     socket.on('game_start', ({ foxes, numFoxes, droneLimit, isContinuation, missionNumber }) => {
-      if (pendingHostageTest.current) {
-        pendingHostageTest.current = false;
+      if (pendingHostageMission.current) {
+        pendingHostageMission.current = false;
         socket.emit('start_hostage_mission');
         return;
       }
@@ -80,12 +97,25 @@ export default function App() {
     };
   }, []);
 
+  // Player enters name → mission select (no server connection yet)
   const handleJoin = useCallback((name) => {
+    rawNameRef.current = name;
     setPlayerName(name.toUpperCase());
     setError(null);
+    setPhase('mission-select');
+  }, []);
+
+  // Player picks a mission
+  const handleSelectMission = useCallback((missionId) => {
+    setError(null);
+    if (missionId === 3) {
+      setPhase('level3');
+      return;
+    }
     setPhase('connecting');
+    if (missionId === 2) pendingHostageMission.current = true;
     if (!socket.connected) socket.connect();
-    socket.emit('join', { name });
+    socket.emit('join', { name: rawNameRef.current });
   }, []);
 
   const handleSubmitScore = useCallback((hits, misses, droneCnt) => {
@@ -100,30 +130,28 @@ export default function App() {
     socket.emit('start_hostage_mission');
   }, []);
 
-  const handleTestHostage = useCallback(() => {
-    pendingHostageTest.current = true;
-    setPlayerName('TEST');
-    setError(null);
-    setPhase('connecting');
-    if (!socket.connected) socket.connect();
-    socket.emit('join', { name: 'TEST' });
-  }, []);
-
   const handleContinueHostageMission = useCallback((escaped) => {
     socket.emit('continue_hostage_mission', { escaped });
   }, []);
 
-  const handleStartLevel3 = useCallback(() => {
-    setPhase('level3');
-  }, []);
+  // Mission 2 success — hostage rescued
+  const handleHostageMissionComplete = useCallback(() => {
+    markComplete(2);
+    setPhase('mission-select');
+  }, [markComplete]);
 
-  const handleTestLevel3 = useCallback(() => {
-    setPlayerName('TEST');
-    setPhase('level3');
-  }, []);
+  // Mission 1 success — called from Game.jsx
+  const handleMission1Complete = useCallback(() => {
+    markComplete(1);
+  }, [markComplete]);
 
-  const handlePlayAgain = useCallback(() => {
-    socket.disconnect();
+  // Mission 3 success — called from Level3Game.jsx
+  const handleMission3Complete = useCallback(() => {
+    markComplete(3);
+  }, [markComplete]);
+
+  const handleReturnToMissions = useCallback(() => {
+    if (socket.connected) socket.disconnect();
     setFoxes([]);
     setPlayers([]);
     setGameOver(null);
@@ -132,8 +160,11 @@ export default function App() {
     setDroneLimit(25);
     setIsContinuation(false);
     setMissionNumber(1);
-    setPhase('lobby');
+    setHostageData(null);
+    setPhase('mission-select');
   }, []);
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   if (phase === 'lobby' || phase === 'connecting') {
     return (
@@ -142,8 +173,18 @@ export default function App() {
         connecting={phase === 'connecting'}
         error={error}
         initialName={playerName}
-        onTestHostage={handleTestHostage}
-        onTestLevel3={handleTestLevel3}
+      />
+    );
+  }
+
+  if (phase === 'mission-select') {
+    return (
+      <MissionSelect
+        playerName={playerName}
+        completedMissions={completedMissions}
+        onSelect={handleSelectMission}
+        onBack={() => setPhase('lobby')}
+        error={error}
       />
     );
   }
@@ -159,8 +200,8 @@ export default function App() {
         isContinuation={hostageData.isContinuation ?? false}
         escapedCount={hostageData.escapedCount ?? 0}
         onContinue={handleContinueHostageMission}
-        onStartLevel3={handleStartLevel3}
-        onPlayAgain={handlePlayAgain}
+        onStartLevel3={handleHostageMissionComplete}
+        onPlayAgain={handleReturnToMissions}
       />
     );
   }
@@ -169,7 +210,8 @@ export default function App() {
     return (
       <Level3Game
         playerName={playerName}
-        onPlayAgain={handlePlayAgain}
+        onPlayAgain={handleReturnToMissions}
+        onMissionComplete={handleMission3Complete}
       />
     );
   }
@@ -188,8 +230,8 @@ export default function App() {
       missionNumber={missionNumber}
       onSubmitScore={handleSubmitScore}
       onContinueMission={handleContinueMission}
-      onPlayAgain={handlePlayAgain}
-      onStartHostageMission={handleStartHostageMission}
+      onPlayAgain={handleReturnToMissions}
+      onMissionComplete={handleMission1Complete}
     />
   );
 }

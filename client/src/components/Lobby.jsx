@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function Lobby({ onJoin, connecting, error, initialName = '', onTestHostage, onTestLevel3 }) {
+export default function Lobby({ onJoin, connecting, error, initialName = '' }) {
   const [name, setName] = useState(initialName);
   const [showBriefing, setShowBriefing] = useState(false);
 
@@ -155,26 +155,6 @@ export default function Lobby({ onJoin, connecting, error, initialName = '', onT
           ◈ Read Mission Briefing
         </button>
 
-        {onTestHostage && (
-          <button
-            className="btn-secondary"
-            style={{ marginTop: '.5rem', width: '100%', borderColor: 'rgba(168,85,247,.4)', color: 'var(--purple)' }}
-            disabled={connecting}
-            onClick={onTestHostage}
-          >
-            ⚗ Dev: Test Level 2 — Hostage Rescue
-          </button>
-        )}
-        {onTestLevel3 && (
-          <button
-            className="btn-secondary"
-            style={{ marginTop: '.5rem', width: '100%', borderColor: 'rgba(0,212,255,.4)', color: 'var(--cyan)' }}
-            disabled={connecting}
-            onClick={onTestLevel3}
-          >
-            ⚗ Dev: Test Level 3 — Direct Action
-          </button>
-        )}
       </div>
 
       <div className="lobby-footer">

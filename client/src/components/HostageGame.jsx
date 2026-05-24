@@ -345,7 +345,7 @@ export default function HostageGame({
                 <button className="btn-fire"
                   style={{ marginTop: '1rem', width: 'auto', padding: '0 1.5rem', background: 'var(--purple)' }}
                   onClick={onStartLevel3}>
-                  ▶ Proceed to Level 3 — Direct Action
+                  ✓ Mission Complete — Return to Missions
                 </button>
               )}
               {result.canContinue && (
@@ -355,11 +355,13 @@ export default function HostageGame({
                   ⟩ Proceed to Round {hostageLevel + 1}
                 </button>
               )}
-              <button className="btn-secondary"
-                style={{ marginTop: '.5rem', width: 'auto', padding: '0 1.5rem' }}
-                onClick={onPlayAgain}>
-                ↺ Play Again
-              </button>
+              {!result.success && (
+                <button className="btn-secondary"
+                  style={{ marginTop: '.5rem', width: 'auto', padding: '0 1.5rem' }}
+                  onClick={onPlayAgain}>
+                  ← Return to Missions
+                </button>
+              )}
             </div>
           )}
 
