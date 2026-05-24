@@ -230,18 +230,37 @@ const BLAST_SOUND = [
   'https://archive.org/download/ExplosionSounds/Bomb%2BExplosion.mp3',
 ];
 
+// Preloaded at component mount — avoids fetch latency at detonation
+let _blastAudio = null;
+function primeBlastAudio() {
+  if (_blastAudio) return;
+  _blastAudio = new Audio(BLAST_SOUND[0]);
+  _blastAudio.preload = 'auto';
+  _blastAudio.load();
+}
+
 function timestamp() {
   return new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function playBlastSound() {
-  const tryNext = (i) => {
-    if (i >= BLAST_SOUND.length) return;
-    const a = new Audio(BLAST_SOUND[i]);
+  if (_blastAudio) {
+    _blastAudio.currentTime = 0;
+    _blastAudio.volume = 1.0;
+    _blastAudio.play().catch(() => {
+      const b = new Audio(BLAST_SOUND[1]);
+      b.volume = 1.0;
+      b.play().catch(() => {});
+    });
+  } else {
+    const a = new Audio(BLAST_SOUND[0]);
     a.volume = 1.0;
-    a.play().catch(() => tryNext(i + 1));
-  };
-  tryNext(0);
+    a.play().catch(() => {
+      const b = new Audio(BLAST_SOUND[1]);
+      b.volume = 1.0;
+      b.play().catch(() => {});
+    });
+  }
 }
 
 // ── Place PT-91M tank at arbitrary lat/lon, terrain-aligned ──────────────────
@@ -771,6 +790,8 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
   useEffect(() => {
     if (!containerRef.current || !window.Cesium) return;
     const C = window.Cesium;
+
+    primeBlastAudio();
 
     const creditDiv = document.createElement('div');
     creditDiv.style.display = 'none';
