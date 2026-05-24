@@ -864,7 +864,7 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
       if (viewer.isDestroyed()) return;
       viewer.terrainProvider = tp;
       terrainProviderRef.current = tp;
-      addLog('Terrain loaded. Press "Place Tank" to position vehicles.', 'info');
+      addLog('Terrain loaded. Left-click terrain to mark strike target.', 'info');
     }).catch(() => {
       if (!viewer.isDestroyed()) addLog('Terrain unavailable — flat mode.', 'warn');
     });
@@ -1258,10 +1258,6 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
               <button className="btn-secondary" onClick={handleResetView} style={{ width: '100%' }}>
                 ⊙ Reset View
               </button>
-              <button className="btn-secondary" onClick={handleTestFlyby}
-                style={{ width: '100%', marginTop: '.4rem', color: 'var(--cyan)', borderColor: 'rgba(0,212,255,.3)' }}>
-                ✈ Test Flyby
-              </button>
             </div>
 
             <div style={{ marginTop: '.6rem', fontSize: '.62rem', color: 'var(--t-dim)', lineHeight: 1.7 }}>
@@ -1270,63 +1266,6 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
               <div><span style={{ color: 'var(--cyan)' }}>Right-drag</span> — tilt / rotate</div>
               <div><span style={{ color: 'var(--cyan)' }}>Click</span> — set strike target</div>
             </div>
-          </div>
-
-          <div className="panel">
-            <div className="panel-title">// Tank Placement</div>
-
-            <button
-              style={{
-                width: '100%', padding: '.5rem .75rem', marginBottom: '.4rem',
-                fontFamily: 'var(--font-mono)', fontSize: '.72rem', fontWeight: 700,
-                letterSpacing: '.08em', cursor: 'pointer', borderRadius: '3px',
-                border: `1px solid ${tankMode ? 'rgba(255,210,0,.8)' : 'rgba(255,210,0,.3)'}`,
-                background: tankMode ? 'rgba(255,200,0,.15)' : 'rgba(255,200,0,.05)',
-                color: tankMode ? '#FFD700' : 'rgba(255,210,0,.5)',
-                transition: 'all .2s',
-              }}
-              onClick={handleToggleTankMode}
-            >
-              {tankMode ? '◉ EXIT PLACEMENT MODE' : '⊕ PLACE TANK'}
-            </button>
-
-            {tankMode && !pendingTank && (
-              <div style={{ fontSize: '.6rem', color: 'var(--cyan)', lineHeight: 1.6 }}>
-                Click terrain to mark tank position.
-              </div>
-            )}
-
-            {pendingTank && (
-              <div style={{ marginBottom: '.4rem' }}>
-                <div style={{ fontSize: '.6rem', color: '#FFD700', lineHeight: 1.7, marginBottom: '.35rem' }}>
-                  Confirm location?<br />
-                  {pendingTank.lat.toFixed(5)}°N<br />
-                  {pendingTank.lon.toFixed(5)}°E
-                </div>
-                <div style={{ display: 'flex', gap: '.4rem' }}>
-                  <button className="btn-secondary" onClick={handleConfirmTank}
-                    style={{ flex: 1, color: '#00FF88', borderColor: 'rgba(0,255,136,.4)' }}>
-                    ✓ Confirm
-                  </button>
-                  <button className="btn-secondary" onClick={handleCancelTank} style={{ flex: 1 }}>
-                    ✗ Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {placedTankList.length > 0 && (
-              <div style={{ marginTop: '.4rem' }}>
-                <div style={{ fontSize: '.58rem', color: 'var(--t-dim)', marginBottom: '.25rem' }}>
-                  Recorded ({placedTankList.length}):
-                </div>
-                <div style={{ maxHeight: '90px', overflowY: 'auto', fontSize: '.55rem', color: 'var(--t-dim)', lineHeight: 1.7 }}>
-                  {placedTankList.map((t, i) => (
-                    <div key={i}>{i + 1}. {t.lat.toFixed(4)}°N {t.lon.toFixed(4)}°E</div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           <button className="btn-secondary" style={{ marginTop: 'auto' }} onClick={onPlayAgain}>
