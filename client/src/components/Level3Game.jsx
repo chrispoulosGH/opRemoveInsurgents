@@ -1367,6 +1367,13 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
               }}>
                 ALL TARGETS NEUTRALISED
               </div>
+              <button
+                className="btn-secondary"
+                style={{ marginTop: '2rem', color: 'var(--cyan)', borderColor: 'rgba(0,212,255,.4)', pointerEvents: 'auto' }}
+                onClick={onPlayAgain}
+              >
+                ← Return to Missions
+              </button>
             </div>
           )}
 
