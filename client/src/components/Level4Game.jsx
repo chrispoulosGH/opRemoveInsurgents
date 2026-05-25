@@ -213,8 +213,8 @@ function triggerFlyby(viewer, onReady) {
   });
 }
 
-const CENTER_LAT = 27 + 10/60 + 11.28/3600;  // 27°10′11.28″N
-const CENTER_LON = 56 + 15/60 + 55.88/3600;  // 56°15′55.88″E
+const CENTER_LAT = 27 + 10/60 + 11.28/3600;  // 27°10′11.28″N — target AO
+const CENTER_LON = 56 + 15/60 + 55.88/3600;  // 56°15′55.88″E — target AO
 
 // Hard-coded strike targets — MOAB must land within `radius` metres for a kill
 const TARGETS = [
@@ -222,7 +222,11 @@ const TARGETS = [
   { id: 2, lat: 27.171500, lon: 56.267800, radius: 4.57 }, // ~15 ft — target 2
   { id: 3, lat: 27.168000, lon: 56.263000, radius: 4.57 }, // ~15 ft — target 3
 ];
-const INIT_ALT   = 20600;
+
+// Starting view — full globe, western hemisphere. Player must navigate to the target.
+const INIT_ALT   = 20_600_000; // 20 600 km — full globe altitude
+const INIT_START_LAT =  30.0;  // centred on North America
+const INIT_START_LON = -90.0;
 const ESRI_SAT   = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const ARCGIS_TRN = 'https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer';
 const BLAST_SOUND = [
@@ -802,9 +806,10 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
 
     viewer.scene.globe.depthTestAgainstTerrain = true;
 
-    // Terrain in Hormuzgan sits around 2083m — clamp camera at 2500m
+    // Terrain in Hormuzgan sits around 2083m — clamp camera at 2500m when zoomed in
     const MIN_CAM_HEIGHT = 2500;
     viewer.scene.screenSpaceCameraController.minimumZoomDistance = MIN_CAM_HEIGHT;
+    viewer.scene.screenSpaceCameraController.maximumZoomDistance = 30_000_000;
     const onPostUpdate = () => {
       if (viewer.isDestroyed()) return;
       const h = viewer.camera.positionCartographic.height;
@@ -816,10 +821,10 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
     };
     viewer.scene.postUpdate.addEventListener(onPostUpdate);
 
-    viewer.camera.flyTo({
-      destination:  C.Cartesian3.fromDegrees(CENTER_LON, CENTER_LAT - 0.068, INIT_ALT),
-      orientation:  { heading: C.Math.toRadians(0), pitch: C.Math.toRadians(-25), roll: 0 },
-      duration:     1.5,
+    // Start over the western hemisphere — full globe view. Player must navigate to target.
+    viewer.camera.setView({
+      destination:  C.Cartesian3.fromDegrees(INIT_START_LON, INIT_START_LAT, INIT_ALT),
+      orientation:  { heading: 0, pitch: C.Math.toRadians(-90), roll: 0 },
     });
 
     // Preload explosion GLB
@@ -840,7 +845,8 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
     viewer.camera.changed.addEventListener(() => {
       const carto = C.Cartographic.fromCartesian(viewer.camera.position);
       const h = carto.height;
-      if (camAltRef.current) camAltRef.current.textContent = `${Math.round(h).toLocaleString()}m`;
+      const altStr = h >= 10_000 ? `${Math.round(h / 1000).toLocaleString()} km` : `${Math.round(h).toLocaleString()} m`;
+      if (camAltRef.current) camAltRef.current.textContent = altStr;
       if (camLatRef.current) camLatRef.current.textContent = `${C.Math.toDegrees(carto.latitude).toFixed(4)}°N`;
       if (camLonRef.current) camLonRef.current.textContent = `${C.Math.toDegrees(carto.longitude).toFixed(4)}°E`;
     });
@@ -1079,11 +1085,11 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
     if (!viewer || !window.Cesium) return;
     const C = window.Cesium;
     viewer.camera.flyTo({
-      destination:  C.Cartesian3.fromDegrees(CENTER_LON, CENTER_LAT - 0.068, INIT_ALT),
-      orientation:  { heading: C.Math.toRadians(0), pitch: C.Math.toRadians(-25), roll: 0 },
-      duration:     1.5,
+      destination:  C.Cartesian3.fromDegrees(INIT_START_LON, INIT_START_LAT, INIT_ALT),
+      orientation:  { heading: 0, pitch: C.Math.toRadians(-90), roll: 0 },
+      duration:     2.0,
     });
-    addLog('View reset to AO centre.', '');
+    addLog('View reset to global overview.', '');
   }, [addLog]);
 
   const launchReady = hasTarget && !strikeInProg && !failReason && bombsLeft > 0;
@@ -1102,7 +1108,7 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
         <div className="hud-stats">
           <div className="hud-stat">
             <span className="hud-stat-label">Alt</span>
-            <span className="hud-stat-value" ref={camAltRef}>{Math.round(INIT_ALT).toLocaleString()}m</span>
+            <span className="hud-stat-value" ref={camAltRef}>{Math.round(INIT_ALT / 1000).toLocaleString()} km</span>
           </div>
           <div className="hud-stat">
             <span className="hud-stat-label">Lat</span>
