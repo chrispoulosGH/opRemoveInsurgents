@@ -731,7 +731,7 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
     const cy = Math.max(0, (window.innerHeight - 420) / 2);
     return [{ x: cx, y: cy }, { x: cx, y: cy }, { x: cx, y: cy }];
   });
-  const dragRef = useRef(null); // { idx, startMX, startMY, startX, startY }
+  const dragRef = useRef(null);
   const [strikeInProg,   setStrikeInProg]   = useState(false);
   // DOM refs for high-frequency updates — avoid React re-renders at 60fps
   const crosshairHRef  = useRef(null);
@@ -755,21 +755,6 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
   ]);
   const logEndRef = useRef(null);
 
-  const addLog = useCallback((msg, cls = '') => {
-    setLog(prev => [...prev, { ts: timestamp(), msg, cls }].slice(-60));
-    setTimeout(() => logEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-  }, []);
-
-  const speakMinutes = useCallback((n) => {
-    speakReport(`You have ${n} minute${n !== 1 ? 's' : ''} remaining`);
-  }, []);
-
-  const handleClockExpire = useCallback(() => {
-    setFailReason('TIME EXPIRED — TARGET SITES COMPROMISED');
-    addLog('⚠ TIME EXPIRED — MISSION FAILED', 'warn');
-  }, [addLog]);
-
-  // Drag handlers for intel image overlays
   useEffect(() => {
     const onMove = (e) => {
       if (!dragRef.current) return;
@@ -786,6 +771,21 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
       document.removeEventListener('mouseup',   onUp);
     };
   }, []);
+
+  const addLog = useCallback((msg, cls = '') => {
+    setLog(prev => [...prev, { ts: timestamp(), msg, cls }].slice(-60));
+    setTimeout(() => logEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+  }, []);
+
+  const speakMinutes = useCallback((n) => {
+    speakReport(`You have ${n} minute${n !== 1 ? 's' : ''} remaining`);
+  }, []);
+
+  const handleClockExpire = useCallback(() => {
+    setFailReason('TIME EXPIRED — TARGET SITES COMPROMISED');
+    addLog('⚠ TIME EXPIRED — MISSION FAILED', 'warn');
+  }, [addLog]);
+
 
   useEffect(() => {
     if (!containerRef.current || !window.Cesium) return;
@@ -840,19 +840,6 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
     });
 
 
-    // ── Vent models at each target location ──────────────────────────────────
-    TARGETS.forEach(t => {
-      viewer.entities.add({
-        position: C.Cartesian3.fromDegrees(t.lon, t.lat),
-        model: {
-          uri: '/vent.glb',
-          heightReference: C.HeightReference.CLAMP_TO_GROUND,
-          scale: 1,
-          minimumPixelSize: 32,
-          maximumScale: 200,
-        },
-      });
-    });
 
     // Preload explosion GLB — must be show:true (even at scale ~0) for Cesium to upload textures to GPU
     viewer.entities.add({
@@ -871,7 +858,8 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
 
     viewer.camera.changed.addEventListener(() => {
       const carto = C.Cartographic.fromCartesian(viewer.camera.position);
-      if (camAltRef.current) camAltRef.current.textContent = `${Math.round(carto.height).toLocaleString()}m`;
+      const h = carto.height;
+      if (camAltRef.current) camAltRef.current.textContent = `${Math.round(h).toLocaleString()}m`;
       if (camLatRef.current) camLatRef.current.textContent = `${C.Math.toDegrees(carto.latitude).toFixed(4)}°N`;
       if (camLonRef.current) camLonRef.current.textContent = `${C.Math.toDegrees(carto.longitude).toFixed(4)}°E`;
     });
@@ -1175,11 +1163,11 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
                 className="btn-secondary"
                 style={{
                   width: '100%', marginBottom: '.3rem', textAlign: 'left',
-                  color:       ventVisible[i] ? 'var(--cyan)'          : 'rgba(255,210,0,.85)',
-                  borderColor: ventVisible[i] ? 'rgba(0,212,255,.6)'   : 'rgba(255,210,0,.55)',
-                  background:  ventVisible[i] ? 'rgba(0,212,255,.12)'  : 'rgba(255,200,0,.08)',
-                  boxShadow:   ventVisible[i] ? '0 0 8px rgba(0,212,255,.25)' : '0 0 6px rgba(255,200,0,.2)',
-                  fontWeight:  700,
+                  color:       ventVisible[i] ? 'var(--cyan)'                  : 'rgba(255,210,0,.85)',
+                  borderColor: ventVisible[i] ? 'rgba(0,212,255,.6)'           : 'rgba(255,210,0,.55)',
+                  background:  ventVisible[i] ? 'rgba(0,212,255,.12)'          : 'rgba(255,200,0,.08)',
+                  boxShadow:   ventVisible[i] ? '0 0 8px rgba(0,212,255,.25)'  : '0 0 6px rgba(255,200,0,.2)',
+                  fontWeight: 700,
                 }}
                 onClick={() => setVentVisible(v => v.map((x, j) => j === i ? !x : x))}
               >
@@ -1362,7 +1350,6 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
               userSelect: 'none',
               boxShadow: '0 4px 24px rgba(0,0,0,.7)',
             }}>
-              {/* Drag handle */}
               <div
                 onMouseDown={(e) => {
                   e.preventDefault();
