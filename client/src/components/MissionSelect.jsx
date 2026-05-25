@@ -49,6 +49,22 @@ const MISSIONS = [
       'You have three bombs and ten minutes. All three shafts must be destroyed for mission success. Strike radius is fifteen feet — precision is everything.',
     ],
   },
+  {
+    id: 4,
+    code: 'OP-SAFFRON',
+    title: 'STRIKE HORMUZ FACILITY',
+    type: 'STRATEGIC STRIKE — WMD DENIAL',
+    classification: 'EYES ONLY',
+    location: 'HORMUZGAN PROVINCE, IRAN',
+    assets: 'B-52 / MOAB ORDNANCE × 3',
+    difficulty: 'CRITICAL',
+    diffColor: '#FF3030',
+    briefing: [
+      'Satellite intelligence confirms enriched uranium stockpiles stored in a hardened underground facility in Hormuzgan Province, Iran, near the Strait of Hormuz.',
+      'Three ventilation shafts provide the only access to the bunker below. Each shaft must receive a direct MOAB hit to breach and destroy the nuclear stores.',
+      'You have three bombs and ten minutes. All three shafts must be destroyed for mission success. Strike radius is fifteen feet — precision is everything.',
+    ],
+  },
 ];
 
 export default function MissionSelect({ playerName, completedMissions, onSelect, onBack, error }) {
