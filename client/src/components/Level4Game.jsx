@@ -216,11 +216,9 @@ function triggerFlyby(viewer, onReady) {
 const CENTER_LAT = 27 + 10/60 + 11.28/3600;  // 27°10′11.28″N — target AO
 const CENTER_LON = 56 + 15/60 + 55.88/3600;  // 56°15′55.88″E — target AO
 
-// Hard-coded strike targets — MOAB must land within `radius` metres for a kill
+// Single docking area — MOAB must land within 200 yards (182.88 m) for a kill
 const TARGETS = [
-  { id: 1, lat: 27.169800, lon: 56.265522, radius: 4.57 }, // ~15 ft — target 1
-  { id: 2, lat: 27.171500, lon: 56.267800, radius: 4.57 }, // ~15 ft — target 2
-  { id: 3, lat: 27.168000, lon: 56.263000, radius: 4.57 }, // ~15 ft — target 3
+  { id: 1, lat: 27.169800, lon: 56.265522, radius: 182.88 },
 ];
 
 // Starting view — full globe, western hemisphere. Player must navigate to the target.
@@ -444,23 +442,21 @@ function detonateStrike(viewer, lat, lon, groundAlt, addLog, onHit) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BRIEF_IMAGES = [
-  { src: '/SOH_1.png', label: 'VENTILATION SHAFT — ALPHA' },
-  { src: '/SOH_1.png', label: 'VENTILATION SHAFT — BRAVO' },
-  { src: '/SOH_1.png', label: 'VENTILATION SHAFT — CHARLIE' },
+  { src: '/SOH_1.png', label: 'DOCKING AREA — AERIAL RECON' },
 ];
 
 const NARRATION_SCRIPT =
-  'Agent. Listen carefully. ' +
-  'Intelligence has confirmed enriched uranium stockpiles stored deep underground ' +
-  'in Hormuzgan Province, Iran, near the Strait of Hormuz. ' +
-  'Three ventilation shafts provide the only access to the hardened facility. ' +
-  'These images show the shaft openings. Study them carefully. ' +
-  'Your mission is to deliver precision ordnance through each shaft. ' +
-  'Every bomb must be a direct hit. Strike radius is fifteen feet. ' +
-  'You have three bombs and three targets. ' +
-  'All three must be destroyed for mission success. ' +
-  'You have ten minutes. There is no margin for error. ' +
-  'Use pan and zoom controls to visually locate targets. Good hunting.';
+  'Agent. Be advised. ' +
+  'Oil tankers and barges are under sustained attack from high-speed armed boats. ' +
+  'Multiple vessels have been hit. ' +
+  'Low-level aerial reconnaissance has located what we believe is the primary ' +
+  'docking and staging area used by these boats. ' +
+  'Study the recon image carefully. The location of the area of operations is classified. ' +
+  'You will need to find it yourself. ' +
+  'You have one MOAB. Locate the docking facility and eliminate it. ' +
+  'Strike radius is two hundred yards. ' +
+  'You have three minutes. The clock starts when you close this briefing. ' +
+  'Do not waste time. Good hunting.';
 
 function Level4Briefing({ onReady }) {
   const [subtitle,  setSubtitle]  = useState('');
@@ -524,25 +520,25 @@ function Level4Briefing({ onReady }) {
           ██ CLASSIFIED — EYES ONLY
         </div>
         <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#fff', letterSpacing: '.14em' }}>
-          OPERATION SAFFRON
+          OPERATION IRONCLAD
         </div>
         <div style={{ fontSize: '.62rem', color: 'var(--t-ghost)', letterSpacing: '.1em' }}>
-          LEVEL 4 — DIRECT ACTION
+          LEVEL 4 — MARITIME STRIKE
         </div>
       </div>
 
       {/* Body: images top, intel right */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
 
-        {/* Three images side by side — each 20vw wide, square */}
+        {/* Recon image — centred, fills available width */}
         <div style={{
-          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-evenly',
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: '#000', borderRight: '1px solid rgba(0,212,255,.12)',
-          padding: '0 1vw',
+          padding: '1.5vw',
         }}>
           {BRIEF_IMAGES.map((img, i) => (
             <div key={i} style={{
-              width: '20vw', height: '20vw', position: 'relative', flexShrink: 0,
+              width: '62vw', height: '46vw', maxHeight: '70vh', position: 'relative', flexShrink: 0,
               border: '1px solid rgba(0,212,255,.35)',
             }}>
               <img src={img.src} alt={img.label} style={{
@@ -584,19 +580,19 @@ function Level4Briefing({ onReady }) {
         }}>
           <div>
             <div style={{ fontSize: '.55rem', color: 'var(--t-ghost)', letterSpacing: '.2em', marginBottom: '.3rem' }}>
-              HORMUZGAN PROVINCE, IRAN
+              CLASSIFIED AO — MARITIME STRIKE
             </div>
             <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#fff', letterSpacing: '.1em', lineHeight: 1.2 }}>
-              DESTROY URANIUM<br />ENRICHMENT FACILITY
+              ELIMINATE<br />SPEEDBOAT THREAT
             </div>
           </div>
 
           <div style={{ borderTop: '1px solid rgba(0,212,255,.2)', paddingTop: '.9rem' }}>
             {[
-              ['SHAFTS',    '3', 'var(--amber)'],
-              ['ORDNANCE',  '3', 'var(--amber)'],
-              ['TIME LIMIT','10:00', '#FF4444'],
-              ['STRIKE RADIUS', '15 FT', 'var(--cyan)'],
+              ['TARGET',        'DOCKING AREA', 'var(--amber)'],
+              ['ORDNANCE',      '1 × MOAB',     'var(--amber)'],
+              ['TIME LIMIT',    '03:00',         '#FF4444'],
+              ['STRIKE RADIUS', '200 YD',        'var(--cyan)'],
             ].map(([label, val, col]) => (
               <div key={label} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
@@ -609,13 +605,13 @@ function Level4Briefing({ onReady }) {
           </div>
 
           <div style={{ fontSize: '.62rem', color: 'var(--t-dim)', lineHeight: 2, letterSpacing: '.04em' }}>
-            THREE VENTILATION SHAFTS HAVE BEEN IDENTIFIED ABOVE THE UNDERGROUND FACILITY NEAR THE STRAIT OF HORMUZ.
-            EACH SHAFT MUST RECEIVE A DIRECT HIT TO DESTROY THE STORES BELOW.
+            RECONNAISSANCE HAS LOCATED A DOCKING AREA USED BY HIGH-SPEED ATTACK BOATS.
+            LOCATION OF THE AO IS CLASSIFIED — YOU MUST NAVIGATE TO FIND IT.
             <span style={{ color: 'var(--amber)', display: 'block', marginTop: '.5rem' }}>
-              ⚠ ALL THREE TARGETS MUST BE DESTROYED FOR MISSION SUCCESS.
+              ⚠ YOU HAVE ONE MOAB. ONE CHANCE. DO NOT MISS.
             </span>
             <span style={{ color: 'var(--cyan)', display: 'block', marginTop: '.5rem' }}>
-              USE ZOOM AND PAN CONTROLS TO SEARCH FOR TARGET LOCATIONS.
+              NAVIGATE TO THE TARGET AREA USING PAN AND ZOOM. STUDY THE RECON IMAGE.
             </span>
           </div>
 
@@ -658,7 +654,7 @@ const fmtTime = (s) =>
   `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 function CountdownClock({ onExpire, onMinute, active }) {
-  const [timeLeft, setTimeLeft] = useState(600);
+  const [timeLeft, setTimeLeft] = useState(180);
 
   useEffect(() => {
     if (!active || timeLeft <= 0) return;
@@ -715,12 +711,12 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
   const bombsDroppedRef    = useRef(0);
 
   const [hasTarget,      setHasTarget]      = useState(false);
-  const [bombsLeft,      setBombsLeft]      = useState(3);
-  const [ventVisible,    setVentVisible]    = useState([false, false, false]);
+  const [bombsLeft,      setBombsLeft]      = useState(1);
+  const [ventVisible,    setVentVisible]    = useState([false]);
   const [ventPositions,  setVentPositions]  = useState(() => {
     const cx = Math.max(0, (window.innerWidth  - 560) / 2);
     const cy = Math.max(0, (window.innerHeight - 420) / 2);
-    return [{ x: cx, y: cy }, { x: cx, y: cy }, { x: cx, y: cy }];
+    return [{ x: cx, y: cy }];
   });
   const dragRef = useRef(null);
   const [strikeInProg,   setStrikeInProg]   = useState(false);
@@ -738,9 +734,9 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
   const [showFlyby,           setShowFlyby]           = useState(false);
   const [briefing,            setBriefing]            = useState(true);
   const [log,      setLog]      = useState([
-    { ts: timestamp(), msg: 'LEVEL 4 — DIRECT ACTION — HORMUZGAN PROVINCE', cls: 'warn' },
-    { ts: timestamp(), msg: 'Area of operations: 1 500 m radius active.',    cls: 'info' },
-    { ts: timestamp(), msg: '3D satellite imagery online. Awaiting orders.', cls: '' },
+    { ts: timestamp(), msg: 'LEVEL 4 — MARITIME STRIKE — AO CLASSIFIED', cls: 'warn' },
+    { ts: timestamp(), msg: 'Target: speedboat docking area. 1 MOAB available.', cls: 'info' },
+    { ts: timestamp(), msg: '3D satellite imagery online. Navigate to target.', cls: '' },
     { ts: timestamp(), msg: 'Left-click terrain to mark strike target.',     cls: '' },
   ]);
   const logEndRef = useRef(null);
@@ -974,15 +970,14 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
     const target = targetRef.current;
     if (!target || strikeActive.current) return;
 
-    const bombNum = bombsDroppedRef.current + 1;
-    bombsDroppedRef.current = bombNum;
-    setBombsLeft(3 - bombNum);
+    bombsDroppedRef.current = 1;
+    setBombsLeft(0);
 
     setStrikeInProg(true);
     targetRef.current = null;
     setHasTarget(false);
 
-    addLog(`⚠ BOMB ${bombNum}/3 INBOUND — IMPACT IN 3...`, 'warn');
+    addLog('⚠ MOAB INBOUND — IMPACT IN 3...', 'warn');
     setTimeout(() => addLog('2...', 'warn'), 1000);
     setTimeout(() => addLog('1...', 'warn'), 2000);
 
@@ -1004,18 +999,15 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
 
         if (hitTarget) {
           destroyedRef.current.add(hitTarget.id);
-          addLog(`★ TARGET ${hitTarget.id} DESTROYED — direct hit`, 'warn');
-          setTimeout(() => speakReport('Direct hit. Target destroyed.'), 15000);
-          const allDestroyed = destroyedRef.current.size === TARGETS.length;
-          if (allDestroyed) {
-            setTimeout(() => { setMissionAccomplished(true); onMissionComplete?.(); }, 6200);
-            setTimeout(() => triggerFlyby(viewerRef.current, () => setShowFlyby(true)), 7500);
-          }
+          addLog('★ DOCKING AREA DESTROYED — direct hit', 'warn');
+          setTimeout(() => speakReport('Direct hit. Target eliminated.'), 15000);
+          setTimeout(() => { setMissionAccomplished(true); onMissionComplete?.(); }, 6200);
+          setTimeout(() => triggerFlyby(viewerRef.current, () => setShowFlyby(true)), 7500);
         } else {
-          addLog(`★ BOMB ${bombNum} — MISS. TARGET NOT NEUTRALISED.`, 'warn');
+          addLog('★ MOAB — MISS. DOCKING AREA INTACT.', 'warn');
           setTimeout(() => {
-            speakReport('Ordnance missed target. Operation compromised.');
-            setFailReason('ORDNANCE MISSED TARGET — OPERATION COMPROMISED');
+            speakReport('Ordnance missed. Docking area intact. Mission failed.');
+            setFailReason('ORDNANCE MISSED — DOCKING AREA INTACT');
             addLog('⚠ MISS — MISSION FAILED', 'warn');
           }, 15000);
         }
@@ -1102,7 +1094,7 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
       <div className="hud">
         <div className="hud-brand">
           TACT/CMD
-          <span>LEVEL 4 — DIRECT ACTION</span>
+          <span>LEVEL 4 — MARITIME STRIKE</span>
         </div>
 
         <div className="hud-stats">
@@ -1130,7 +1122,7 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
         {/* Left sidebar */}
         <div className="sidebar">
           <div className="panel">
-            <div className="panel-title accent">// Intel Images</div>
+            <div className="panel-title accent">// Recon Image</div>
             {BRIEF_IMAGES.map((img, i) => (
               <button
                 key={i}
@@ -1153,20 +1145,22 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
           <div className="panel">
             <div className="panel-title accent">// Intel Summary</div>
             <div className="intel-row">
-              <span className="intel-key">AO Centre</span>
-              <span className="intel-val" style={{ fontSize: '.6rem' }}>27°10′N 56°15′E</span>
+              <span className="intel-key">AO</span>
+              <span className="intel-val" style={{ color: 'rgba(255,80,80,.7)' }}>CLASSIFIED</span>
             </div>
             <div className="intel-row">
-              <span className="intel-key">Radius</span>
-              <span className="intel-val">1 500 m</span>
+              <span className="intel-key">Threat</span>
+              <span className="intel-val">SPEEDBOATS</span>
             </div>
             <div className="intel-row">
-              <span className="intel-key">Province</span>
-              <span className="intel-val">Hormuzgan</span>
+              <span className="intel-key">Location</span>
+              <span className="intel-val" style={{ color: 'rgba(255,80,80,.7)' }}>CLASSIFIED</span>
             </div>
             <div className="intel-row">
-              <span className="intel-key">Imagery</span>
-              <span className="intel-val green">LIVE SAT 3D</span>
+              <span className="intel-key">Ordnance</span>
+              <span className="intel-val" style={{ color: bombsLeft === 0 ? '#FF3030' : 'var(--amber)' }}>
+                {bombsLeft === 1 ? '1 × MOAB' : 'EXPENDED'}
+              </span>
             </div>
           </div>
 
@@ -1176,8 +1170,8 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.5rem' }}>
               <span style={{ fontSize: '.6rem', color: 'var(--t-ghost)', letterSpacing: '.1em' }}>ORDNANCE</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '.9rem', fontWeight: 700,
-                color: bombsLeft === 0 ? '#FF3030' : bombsLeft === 1 ? '#FF8800' : 'var(--amber)' }}>
-                {'⬡ '.repeat(bombsLeft)}{'⬢ '.repeat(3 - bombsLeft)}
+                color: bombsLeft === 0 ? '#FF3030' : 'var(--amber)' }}>
+                {'⬡ '.repeat(bombsLeft)}{'⬢ '.repeat(1 - bombsLeft)}
               </span>
             </div>
 
@@ -1266,7 +1260,7 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
                 marginTop: '1rem', fontFamily: 'var(--font-mono)', fontSize: '.9rem',
                 color: '#00FFC8', letterSpacing: '.15em',
               }}>
-                ALL TARGETS NEUTRALISED
+                DOCKING AREA ELIMINATED
               </div>
               <button
                 className="btn-secondary"
