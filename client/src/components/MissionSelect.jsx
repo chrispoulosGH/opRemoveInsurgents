@@ -60,9 +60,9 @@ const MISSIONS = [
     difficulty: 'HIGH',
     diffColor: '#FF8800',
     briefing: [
-      'Oil tankers and barges are under sustained attack from elusive high-speed armed boats. Multiple vessels have been struck. Location of the AO is classified.',
-      'Low-level aerial reconnaissance has located what is believed to be the primary docking and staging area. A recon image will be provided at mission start.',
-      'You have one MOAB and three minutes. Navigate to the area, identify the docking facility, and eliminate it. Strike radius is 200 yards.',
+      'Oil tankers and barges are under sustained attack from elusive high-speed armed boats. Multiple vessels have been struck.',
+      'During the previous hostage extraction, our team secured photographs of what appears to be the speedboat docking and staging area. The images carry no geolocation data.',
+      'You have one MOAB and three minutes. Study the photos, find the facility, and eliminate it. Strike radius is 200 yards.',
     ],
   },
 ];

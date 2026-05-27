@@ -449,10 +449,11 @@ const NARRATION_SCRIPT =
   'Agent. Be advised. ' +
   'Oil tankers and barges are under sustained attack from high-speed armed boats. ' +
   'Multiple vessels have been hit. ' +
-  'Low-level aerial reconnaissance has located what we believe is the primary ' +
-  'docking and staging area used by these boats. ' +
-  'Study the recon image carefully. The location of the area of operations is classified. ' +
-  'You will need to find it yourself. ' +
+  'During the previous hostage extraction, our team secured photographs from inside the compound. ' +
+  'Among them were images of what appears to be a speedboat docking and staging area. ' +
+  'Unfortunately the photos carry no geolocation data — we do not know where this facility is. ' +
+  'That is your problem to solve. ' +
+  'Study the image carefully. Find the area. ' +
   'You have one MOAB. Locate the docking facility and eliminate it. ' +
   'Strike radius is two hundred yards. ' +
   'You have three minutes. The clock starts when you close this briefing. ' +
@@ -580,7 +581,7 @@ function Level4Briefing({ onReady }) {
         }}>
           <div>
             <div style={{ fontSize: '.55rem', color: 'var(--t-ghost)', letterSpacing: '.2em', marginBottom: '.3rem' }}>
-              CLASSIFIED AO — MARITIME STRIKE
+              PHOTOS SECURED — PREVIOUS RAID — NO GEO DATA
             </div>
             <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#fff', letterSpacing: '.1em', lineHeight: 1.2 }}>
               ELIMINATE<br />SPEEDBOAT THREAT
@@ -605,8 +606,8 @@ function Level4Briefing({ onReady }) {
           </div>
 
           <div style={{ fontSize: '.62rem', color: 'var(--t-dim)', lineHeight: 2, letterSpacing: '.04em' }}>
-            RECONNAISSANCE HAS LOCATED A DOCKING AREA USED BY HIGH-SPEED ATTACK BOATS.
-            LOCATION OF THE AO IS CLASSIFIED — YOU MUST NAVIGATE TO FIND IT.
+            PHOTOGRAPHS OF THE DOCKING AREA WERE SECURED DURING THE PREVIOUS HOSTAGE RAID.
+            THE IMAGES CARRY NO GEOLOCATION DATA. YOU MUST IDENTIFY THE LOCATION YOURSELF.
             <span style={{ color: 'var(--amber)', display: 'block', marginTop: '.5rem' }}>
               ⚠ YOU HAVE ONE MOAB. ONE CHANCE. DO NOT MISS.
             </span>
@@ -734,8 +735,8 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
   const [showFlyby,           setShowFlyby]           = useState(false);
   const [briefing,            setBriefing]            = useState(true);
   const [log,      setLog]      = useState([
-    { ts: timestamp(), msg: 'LEVEL 4 — MARITIME STRIKE — AO CLASSIFIED', cls: 'warn' },
-    { ts: timestamp(), msg: 'Target: speedboat docking area. 1 MOAB available.', cls: 'info' },
+    { ts: timestamp(), msg: 'LEVEL 4 — MARITIME STRIKE — LOCATION UNKNOWN', cls: 'warn' },
+    { ts: timestamp(), msg: 'Photos from hostage raid — no geo data. Find the area.', cls: 'info' },
     { ts: timestamp(), msg: '3D satellite imagery online. Navigate to target.', cls: '' },
     { ts: timestamp(), msg: 'Left-click terrain to mark strike target.',     cls: '' },
   ]);
@@ -1145,16 +1146,16 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
           <div className="panel">
             <div className="panel-title accent">// Intel Summary</div>
             <div className="intel-row">
-              <span className="intel-key">AO</span>
-              <span className="intel-val" style={{ color: 'rgba(255,80,80,.7)' }}>CLASSIFIED</span>
+              <span className="intel-key">Source</span>
+              <span className="intel-val" style={{ fontSize: '.58rem' }}>HOSTAGE RAID</span>
             </div>
             <div className="intel-row">
               <span className="intel-key">Threat</span>
               <span className="intel-val">SPEEDBOATS</span>
             </div>
             <div className="intel-row">
-              <span className="intel-key">Location</span>
-              <span className="intel-val" style={{ color: 'rgba(255,80,80,.7)' }}>CLASSIFIED</span>
+              <span className="intel-key">Geo Data</span>
+              <span className="intel-val" style={{ color: '#FF8800' }}>NONE</span>
             </div>
             <div className="intel-row">
               <span className="intel-key">Ordnance</span>
