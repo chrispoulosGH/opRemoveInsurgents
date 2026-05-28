@@ -841,6 +841,25 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
 
 
 
+    // 30 ft × 30 ft gray square draped on terrain at each target site
+    const HALF_M = 4.572; // half of 30 ft in metres
+    TARGETS.forEach(t => {
+      const hLat = HALF_M / 111320;
+      const hLon = HALF_M / (111320 * Math.cos(t.lat * Math.PI / 180));
+      viewer.entities.add({
+        polygon: {
+          hierarchy: new C.PolygonHierarchy([
+            C.Cartesian3.fromDegrees(t.lon - hLon, t.lat - hLat),
+            C.Cartesian3.fromDegrees(t.lon + hLon, t.lat - hLat),
+            C.Cartesian3.fromDegrees(t.lon + hLon, t.lat + hLat),
+            C.Cartesian3.fromDegrees(t.lon - hLon, t.lat + hLat),
+          ]),
+          material: new C.ColorMaterialProperty(C.Color.fromCssColorString('#909090').withAlpha(0.92)),
+          classificationType: C.ClassificationType.TERRAIN,
+        },
+      });
+    });
+
     // Preload explosion GLB — must be show:true (even at scale ~0) for Cesium to upload textures to GPU
     viewer.entities.add({
       position: C.Cartesian3.fromDegrees(CENTER_LON, CENTER_LAT, -5000),
