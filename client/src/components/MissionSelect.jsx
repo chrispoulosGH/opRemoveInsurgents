@@ -50,6 +50,22 @@ const MISSIONS = [
     ],
   },
   {
+    id: 5,
+    code: 'OP-CROSSBOW',
+    title: 'COMBAT AIR PATROL',
+    type: 'CLOSE AIR SUPPORT — TACTICAL STRIKE',
+    classification: 'TOP SECRET',
+    location: 'HINDU KUSH, AFG',
+    assets: 'F-22 RAPTOR — LIVE ORDNANCE',
+    difficulty: 'EXTREME',
+    diffColor: '#FF1010',
+    briefing: [
+      'Enemy ground forces have re-occupied fortified positions in the Hindu Kush mountain range. Close air support is urgently required to suppress and eliminate the threat.',
+      'You will pilot an F-22 Raptor on a combat air patrol over the AO. Navigate using the HUD and engage targets of opportunity with precision ordnance.',
+      'Full interactive flight simulation — mouse controls pitch and roll, keyboard controls throttle. Terrain awareness is critical at altitude.',
+    ],
+  },
+  {
     id: 4,
     code: 'OP-IRONCLAD',
     title: 'ELIMINATE SPEEDBOAT THREAT',

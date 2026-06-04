@@ -5,6 +5,7 @@ import Game from './components/Game';
 import HostageGame from './components/HostageGame';
 import Level3Game from './components/Level3Game';
 import Level4Game from './components/Level4Game';
+import Level5Game from './components/Level5Game';
 import socket from './socket';
 
 function loadCompleted() {
@@ -117,6 +118,10 @@ export default function App() {
       setPhase('level4');
       return;
     }
+    if (missionId === 5) {
+      setPhase('level5');
+      return;
+    }
     setPhase('connecting');
     if (missionId === 2) pendingHostageMission.current = true;
     if (!socket.connected) socket.connect();
@@ -158,6 +163,11 @@ export default function App() {
   // Mission 4 success — called from Level4Game.jsx
   const handleMission4Complete = useCallback(() => {
     markComplete(4);
+  }, [markComplete]);
+
+  // Mission 5 — free-flight patrol, no completion tracking
+  const handleMission5Complete = useCallback(() => {
+    markComplete(5);
   }, [markComplete]);
 
   const handleReturnToMissions = useCallback(() => {
@@ -232,6 +242,16 @@ export default function App() {
         playerName={playerName}
         onPlayAgain={handleReturnToMissions}
         onMissionComplete={handleMission4Complete}
+      />
+    );
+  }
+
+  if (phase === 'level5') {
+    return (
+      <Level5Game
+        playerName={playerName}
+        onPlayAgain={handleReturnToMissions}
+        onMissionComplete={handleMission5Complete}
       />
     );
   }
