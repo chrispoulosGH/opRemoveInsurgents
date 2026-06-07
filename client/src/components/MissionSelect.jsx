@@ -81,6 +81,22 @@ const MISSIONS = [
       'You have one MOAB and three minutes. Study the photos, find the facility, and eliminate it. Strike radius is 200 yards.',
     ],
   },
+  {
+    id: 6,
+    code: 'OP-NIGHTFALL',
+    title: 'TEHRAN NIGHT OVERFLIGHT',
+    type: 'STRATEGIC RECON — NIGHT OPERATIONS',
+    classification: 'EYES ONLY',
+    location: 'TEHRAN METROPOLITAN AREA, IRN',
+    assets: 'F-22 RAPTOR — NVD / STEALTH CONFIG',
+    difficulty: 'CLASSIFIED',
+    diffColor: '#9B59B6',
+    briefing: [
+      'Strategic overflight authorised at 0200 local. Tehran is the fourth-largest city in the Middle East. Population: eight million. Air-defence coverage: extensive.',
+      'Your F-22 is configured for low observability. Helmet-mounted night vision devices are active. Press N to toggle NVD and observe the city grid in green phosphor.',
+      'No weapons. No comms. Presence only. Stay dark, stay high, stay invisible.',
+    ],
+  },
 ];
 
 export default function MissionSelect({ playerName, completedMissions, onSelect, onBack, error }) {
