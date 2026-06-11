@@ -5,3 +5,7 @@ build/
 __pycache__/
 *.pyc
 .env
+
+# Large GLB assets not needed for gameplay
+client/public/neoclassical_apartment_building.glb
+client/public/royal_pavilion.glb
