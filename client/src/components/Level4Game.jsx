@@ -445,8 +445,8 @@ const BRIEF_IMAGES = [
   { src: '/SOH_1.png', label: 'DOCKING AREA — AERIAL RECON' },
 ];
 
-const NARRATION_SCRIPT =
-  'Agent. Be advised. ' +
+const buildNarration4 = (name) =>
+  `Commander ${name}. Be advised. ` +
   'Oil tankers and barges are under sustained attack from high-speed armed boats. ' +
   'Multiple vessels have been hit. ' +
   'During the previous hostage extraction, our team secured photographs from inside the compound. ' +
@@ -457,9 +457,9 @@ const NARRATION_SCRIPT =
   'You have one MOAB. Locate the docking facility and eliminate it. ' +
   'Strike radius is two hundred yards. ' +
   'You have three minutes. The clock starts when you close this briefing. ' +
-  'Do not waste time. Good hunting.';
+  `Do not waste time. Good hunting, Commander ${name}.`;
 
-function Level4Briefing({ onReady }) {
+function Level4Briefing({ onReady, playerName }) {
   const [subtitle,  setSubtitle]  = useState('');
   const [countdown, setCountdown] = useState(3);
   const [showGo,    setShowGo]    = useState(false);
@@ -478,13 +478,14 @@ function Level4Briefing({ onReady }) {
     const female = voices.find(v =>
       /female|woman|zira|samantha|karen|victoria|moira|fiona|veena|susan|heather|allison/i.test(v.name)
     ) ?? null;
-    const u = new SpeechSynthesisUtterance(NARRATION_SCRIPT);
+    const narration = buildNarration4(playerName);
+    const u = new SpeechSynthesisUtterance(narration);
     u.rate   = 0.92;
     u.pitch  = 0.88;
     u.volume = 0.9;
     if (female) u.voice = female;
     u.onboundary = (e) => {
-      if (e.name === 'word') setSubtitle(NARRATION_SCRIPT.slice(0, e.charIndex + e.charLength));
+      if (e.name === 'word') setSubtitle(narration.slice(0, e.charIndex + e.charLength));
     };
     u.onend = () => setPhase('countdown');
     window.speechSynthesis.cancel();
@@ -1090,7 +1091,7 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
   return (
     <div className="game-wrap">
 
-      {briefing && <Level4Briefing onReady={() => setBriefing(false)} />}
+      {briefing && <Level4Briefing playerName={playerName} onReady={() => setBriefing(false)} />}
 
       <div className="hud">
         <div className="hud-brand">
@@ -1113,7 +1114,7 @@ export default function Level4Game({ playerName, onPlayAgain, onMissionComplete 
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.2rem' }}>
-          <div className="hud-player">AGENT <strong>{playerName}</strong></div>
+          <div className="hud-player">COMMANDER <strong>{playerName}</strong></div>
           <div className="hud-connection"><div className="dot-online" />SECURE LINK ACTIVE</div>
         </div>
       </div>

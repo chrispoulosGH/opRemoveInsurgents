@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { speakReport } from '../audio';
 
-// ── F-22 Raptor — Tehran Overflight / OP-NIGHTFALL ────────────────────────────
+// ── B-1B Lancer — Tehran Strike / OP-IRON FIST ───────────────────────────────
 // Autopilot orbits Tehran at 30 000 ft. Player selects targets (Tab) and
 // launches JASSM missiles (Space), then guides them to the target via mouse.
 
@@ -27,11 +27,6 @@ const ARCGIS_TRN  = 'https://elevation3d.arcgis.com/arcgis/rest/services/WorldEl
 const HUD_G       = '#00FF41';
 const TEHRAN_MSL  = 1220;       // Tehran ground elevation (m MSL)
 // Toggle to disable missile decommissioning (SAM / connection lost) for testing.
-// Set true to let missiles fly to the target without being removed by SAM intercept.
-const DECOMMISSION_DISABLED = true;
-// Toggle to disable short warning speech (MSL/AGL) for testing.
-// Set true to temporarily silence terrain/sea-level ceiling warnings.
-const WARNINGS_DISABLED = true;
 
 const GOV_TARGETS = [
   { name: 'PRESIDENTIAL COMPLEX',   lat: 35.7050, lon: 51.4200 },
@@ -380,15 +375,16 @@ function drawHUD(canvas, f, targets = [], missileActive = false, distToTarget = 
 }
 
 // ── Briefing ──────────────────────────────────────────────────────────────────
-const NARRATION_6 =
-  'Agent. You are the weapons officer aboard an F-22 Raptor in autopilot orbit over Tehran. ' +
-  'Ten Iranian government facilities have been designated for elimination. ' +
-  'Use Tab to cycle through targets. Press Space to launch a JASSM cruise missile. ' +
-  'Once launched, guide the missile to the target using your mouse. ' +
-  'The secondary screen shows the missile camera. Watch it. Steer it. Hit the target. ' +
-  'Eliminate all ten facilities. Good hunting.';
+const buildNarration6 = (name) =>
+  `Commander ${name}. By direct order of President Trump, you are to annihilate all traces of Iran's oppressive Islamic rule. ` +
+  'You are aboard a B-1B Lancer inbound from the Caspian Sea, heading south toward Tehran. ' +
+  'Ten high-value government targets have been pre-selected. ' +
+  'You will remotely guide cruise missiles through the Alborz mountain passes toward their objectives in the city. ' +
+  'Stay low. Avoid detection. The enemy\'s missile defense systems are active. ' +
+  'Use Tab to cycle targets. Press Space to launch. Guide with your mouse. ' +
+  `Leave nothing standing. Good hunting, Commander ${name}.`;
 
-function Level6Briefing({ onReady }) {
+function Level6Briefing({ onReady, playerName }) {
   const [subtitle,  setSubtitle]  = useState('');
   const [countdown, setCountdown] = useState(3);
   const [showGo,    setShowGo]    = useState(false);
@@ -404,13 +400,14 @@ function Level6Briefing({ onReady }) {
   useEffect(() => {
     if (!window.speechSynthesis) { setPhase('countdown'); return; }
     const voices = window.speechSynthesis.getVoices();
-    const female = voices.find(v =>
-      /female|woman|zira|samantha|karen|victoria|moira|fiona|veena|susan|heather|allison/i.test(v.name)
-    ) ?? null;
-    const u = new SpeechSynthesisUtterance(NARRATION_6);
-    u.rate = 0.92; u.pitch = 0.88; u.volume = 0.9;
-    if (female) u.voice = female;
-    u.onboundary = e => { if (e.name === 'word') setSubtitle(NARRATION_6.slice(0, e.charIndex + e.charLength)); };
+    const male = voices.find(v =>
+      /male|man|david|mark|daniel|alex|fred|bruce|tom|james|eric|guy|reed|junior|ralph/i.test(v.name)
+    ) ?? voices.find(v => !/female|woman|zira|samantha|karen|victoria|moira|fiona|veena|susan|heather|allison/i.test(v.name)) ?? null;
+    const narration = buildNarration6(playerName);
+    const u = new SpeechSynthesisUtterance(narration);
+    u.rate = 0.88; u.pitch = 0.75; u.volume = 0.9;
+    if (male) u.voice = male;
+    u.onboundary = e => { if (e.name === 'word') setSubtitle(narration.slice(0, e.charIndex + e.charLength)); };
     u.onend = () => setPhase('countdown');
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
@@ -436,7 +433,7 @@ function Level6Briefing({ onReady }) {
         background: 'rgba(0,0,0,.5)',
       }}>
         <div style={{ fontSize: '.65rem', color: 'var(--cyan)', letterSpacing: '.18em' }}>██ EYES ONLY</div>
-        <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#fff', letterSpacing: '.14em' }}>OPERATION NIGHTFALL</div>
+        <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#fff', letterSpacing: '.14em' }}>OPERATION IRON FIST</div>
         <div style={{ fontSize: '.62rem', color: 'var(--t-ghost)', letterSpacing: '.1em' }}>LEVEL 6 — STRATEGIC STRIKE</div>
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
@@ -445,20 +442,21 @@ function Level6Briefing({ onReady }) {
           display: 'flex', flexDirection: 'column', gap: '1.6rem',
         }}>
           <div style={{ fontSize: '.5rem', color: 'var(--t-ghost)', letterSpacing: '.22em' }}>
-            WEAPONS OFFICER BRIEFING — F-22A / OP-NIGHTFALL
+            WEAPONS OFFICER BRIEFING — B-1B LANCER / OP-IRON FIST
           </div>
           <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#fff', letterSpacing: '.1em', lineHeight: 1.2 }}>
-            STRATEGIC STRIKE<br />TEHRAN AO — 10 TARGETS
+            ELIMINATE IRAN'S<br />ISLAMIC REGIME — 10 TARGETS
           </div>
           {[
-            ['PLATFORM',  'F-22A RAPTOR — AUTOPILOT',         'var(--cyan)'],
+            ['PLATFORM',  'B-1B LANCER — INBOUND SOUTH',      'var(--cyan)'],
+            ['INGRESS',   'CASPIAN SEA → ALBORZ MTN PASS',    'rgba(255,255,255,.7)'],
             ['AO',        'TEHRAN METROPOLITAN AREA, IRN',     'rgba(255,255,255,.7)'],
-            ['ALTITUDE',  '30 000 FT MSL',                    'var(--amber)'],
-            ['SPEED',     '600 MPH / CONSTANT',               'var(--amber)'],
+            ['AUTHORITY', 'DIRECT ORDER — PRESIDENT TRUMP',   '#FF2020'],
+            ['THREAT',    'ACTIVE SAM NETWORKS — STAY LOW',   'var(--amber)'],
             ['Tab',       'CYCLE TARGETS',                    '#00FF88'],
-            ['Space',     'LAUNCH JASSM CRUISE MISSILE',      '#FF2020'],
-            ['Mouse',     'GUIDE MISSILE TO TARGET',          'var(--cyan)'],
-            ['OBJECTIVE', 'ELIMINATE ALL 10 GOV FACILITIES',  '#FF2020'],
+            ['Space',     'LAUNCH CRUISE MISSILE',            '#FF2020'],
+            ['Mouse',     'GUIDE MISSILE THROUGH MOUNTAINS',  'var(--cyan)'],
+            ['OBJECTIVE', 'DESTROY ALL 10 GOV TARGETS',       '#FF2020'],
           ].map(([k, v, col]) => (
             <div key={k} style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
@@ -528,16 +526,9 @@ export default function Level6Game({ playerName, onPlayAgain }) {
   // missileStateRef: live physics state for the guided missile
   const missileRef      = useRef(null);
   const missileStateRef = useRef(null);
-  const msViolationRef  = useRef({ start: null, graceUntil: null });
+  const msViolationRef  = useRef({ start: null, graceUntil: null, intercepting: false });
   // pendingLaunchRef removed: immediate launch on confirm (second Space)
   const periodicAnnounceRef = useRef(null);
-  const warnFlagsRef = useRef({ msl: false, agl: false });
-  // Intercept thresholds (used to decide SAM decommissioning)
-  const ANNOUNCE_MSL = 10000 * 0.3048; // metres
-  const ANNOUNCE_AGL = 2000 * 0.3048;  // metres
-  // Audio warning thresholds (separate from intercept gating)
-  const WARN_MSL = 9500 * 0.3048; // metres
-  const WARN_AGL = 1800 * 0.3048; // metres
   const awaitLaunchConfirmRef = useRef(false);
 
   const audioCtxRef    = useRef(null);
@@ -550,8 +541,9 @@ export default function Level6Game({ playerName, onPlayAgain }) {
   const [missileEverFired, setMissileEverFired] = useState(false);
   const [missionComplete,  setMissionComplete]  = useState(false);
   const [chaseConnLost,    setChaseConnLost]    = useState(false);
+  const [showAlborz,       setShowAlborz]       = useState(false);
   const [log,             setLog]             = useState([
-    { ts: timestamp(), msg: 'LEVEL 6 — TEHRAN OVERFLIGHT', cls: 'warn' },
+    { ts: timestamp(), msg: 'LEVEL 6 — OP-IRON FIST / TEHRAN STRIKE', cls: 'warn' },
     { ts: timestamp(), msg: 'Autopilot engaged. 30 000 ft / 600 mph.', cls: 'info' },
     { ts: timestamp(), msg: 'Tab: cycle targets  |  Space: launch JASSM', cls: '' },
     { ts: timestamp(), msg: 'Mouse steers the missile after launch.', cls: '' },
@@ -577,18 +569,26 @@ export default function Level6Game({ playerName, onPlayAgain }) {
       infoBox: false, selectionIndicator: false, creditContainer: creditDiv,
     });
 
+    // Increase parallel tile requests globally (Cesium default is 6)
+    C.RequestScheduler.maximumRequestsPerServer = 18;
+
     viewer.imageryLayers.addImageryProvider(
-      new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 23 })
+      new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 19 })
     );
     viewer.scene.globe.depthTestAgainstTerrain = true;
+    viewer.scene.globe.maximumScreenSpaceError = 4;   // default 2; halves tile count
+    viewer.scene.globe.tileCacheSize           = 500; // default 100
     viewer.scene.fog.enabled  = true;
-    viewer.scene.fog.density  = 0.00008;
+    viewer.scene.fog.density  = 0.00012; // slightly denser = fewer far tiles needed
 
     const ctrl = viewer.scene.screenSpaceCameraController;
     ctrl.enableRotate = ctrl.enableTranslate = ctrl.enableZoom = false;
     ctrl.enableTilt   = ctrl.enableLook      = false;
 
-    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN).then(tp => {
+    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN, {
+      requestVertexNormals: false,
+      requestWaterMask:     false,
+    }).then(tp => {
       if (!viewer.isDestroyed()) viewer.terrainProvider = tp;
     }).catch(() => {});
 
@@ -641,16 +641,21 @@ export default function Level6Game({ playerName, onPlayAgain }) {
     });
 
     pip.imageryLayers.addImageryProvider(
-      new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 23 })
+      new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 17 })
     );
     pip.scene.globe.depthTestAgainstTerrain = true;
+    pip.scene.globe.maximumScreenSpaceError = 6;
+    pip.scene.globe.tileCacheSize           = 300;
     pip.scene.fog.enabled = false;
 
     const pipCtrl = pip.scene.screenSpaceCameraController;
     pipCtrl.enableRotate = pipCtrl.enableTranslate = pipCtrl.enableZoom = false;
     pipCtrl.enableTilt   = pipCtrl.enableLook      = false;
 
-    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN).then(tp => {
+    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN, {
+      requestVertexNormals: false,
+      requestWaterMask:     false,
+    }).then(tp => {
       if (!pip.isDestroyed()) pip.terrainProvider = tp;
     }).catch(() => {});
 
@@ -734,15 +739,20 @@ export default function Level6Game({ playerName, onPlayAgain }) {
       infoBox: false, selectionIndicator: false, creditContainer: creditDiv,
     });
     tcam.imageryLayers.addImageryProvider(
-      new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 23 })
+      new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 17 })
     );
     tcam.scene.globe.depthTestAgainstTerrain = false;
+    tcam.scene.globe.maximumScreenSpaceError = 6;
+    tcam.scene.globe.tileCacheSize           = 300;
     tcam.scene.fog.enabled = false;
     const tc = tcam.scene.screenSpaceCameraController;
     tc.enableRotate = tc.enableTranslate = tc.enableZoom = false;
     tc.enableTilt   = tc.enableLook      = false;
 
-    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN).then(tp => {
+    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN, {
+      requestVertexNormals: false,
+      requestWaterMask:     false,
+    }).then(tp => {
       if (!tcam.isDestroyed()) tcam.terrainProvider = tp;
     }).catch(() => {});
 
@@ -962,11 +972,7 @@ export default function Level6Game({ playerName, onPlayAgain }) {
           setMissileEverFired(true);
           setChaseConnLost(false);
           awaitLaunchConfirmRef.current = false;
-          // reset warning flags for new missile
-          warnFlagsRef.current = { msl: false, agl: false };
-          msViolationRef.current.start = null;
-          // 30s grace period after launch to allow initial descent
-          msViolationRef.current.graceUntil = Date.now() + 30000;
+          msViolationRef.current = { start: null, graceUntil: Date.now() + 30000, intercepting: false };
           addLog(`JASSM AWAY — TARGET: ${tgt.name}`, 'warn');
           addLog('MOUSE TO GUIDE MISSILE.', '');
         }
@@ -1067,141 +1073,76 @@ export default function Level6Game({ playerName, onPlayAgain }) {
         ms.lon += mSpeedMs * dt * Math.sin(mHdgRad) / (111320 * Math.cos(ms.lat * Math.PI / 180));
         ms.alt  = ms.alt + mSpeedMs * Math.sin(ms.pitch * Math.PI / 180) * dt;
 
-        // ── Altitude constraint monitoring (mission rules) ───────────────
-        // Fail if missile remains above 8000 ft MSL or 1000 ft AGL for > 2 seconds
+        // ── SAM intercept: any condition held for ≥3 continuous seconds ────────────
+        // • >3000 ft AGL anywhere
+        // • >10000 ft MSL anywhere
+        // • >500 ft AGL within 5 miles of target
         try {
-          const terrainCarto2 = C.Cartographic.fromDegrees(ms.lon, ms.lat);
           const now = Date.now();
           if (msViolationRef.current.graceUntil && now < msViolationRef.current.graceUntil) {
-            // still in initial descent grace period — ignore altitude violations
             msViolationRef.current.start = null;
-          } else {
-            const groundH2 = viewer.scene.globe.getHeight(terrainCarto2) ?? TEHRAN_MSL;
-            // Announce warnings when crossing configured thresholds
-            try {
-              const overAnnounceMSL = ms.alt > WARN_MSL;
-              const overAnnounceAGL = (ms.alt - groundH2) > WARN_AGL;
-              if (overAnnounceMSL && !warnFlagsRef.current.msl) {
-                warnFlagsRef.current.msl = true;
-                const msAltFt = Math.round(ms.alt / 0.3048);
-                const msg = `Warning: missile altitude ${msAltFt} feet above sea level.`;
-                if (!WARNINGS_DISABLED) try { speakReport(msg); } catch (e) {}
-                addLog(msg, 'warn');
-              }
-              if (overAnnounceAGL && !warnFlagsRef.current.agl) {
-                warnFlagsRef.current.agl = true;
-                const aglFt = Math.round((ms.alt - groundH2) / 0.3048);
-                const msg = `Warning: missile ${aglFt} feet above terrain.`;
-                if (!WARNINGS_DISABLED) try { speakReport(msg); } catch (e) {}
-                addLog(msg, 'warn');
-              }
-            } catch (e) {}
-            const MSL_LIMIT = 9000 * 0.3048; // metres
-            const AGL_LIMIT = 1000 * 0.3048; // metres
-            const currentAGL = ms.alt - groundH2;
-            // For decommissioning, require AGL or MSL to reach configured announce thresholds
-            const overAGLForIntercept = currentAGL >= ANNOUNCE_AGL;
-            const overMSLForIntercept = ms.alt >= ANNOUNCE_MSL;
-            // Intercept occurs only if either threshold is exceeded continuously for 3 seconds
-            if (overAGLForIntercept || overMSLForIntercept) {
-              if (!msViolationRef.current.start) msViolationRef.current.start = Date.now();
-              else if ((Date.now() - msViolationRef.current.start) / 1000 > 3.0) {
-                // SAM intercept — play voice warning including specific reason (MSL or AGL)
-                const msAltFt = Math.round(ms.alt / 0.3048);
-                const groundH2_now = viewer.scene.globe.getHeight(terrainCarto2) ?? TEHRAN_MSL;
-                const aglNow = Math.max(0, ms.alt - groundH2_now);
-                const aglFt = Math.round(aglNow / 0.3048);
-                let reason = '';
-                // Build reason text using current values
-                const overMSL = ms.alt > MSL_LIMIT;
-                const overAGL = aglNow > AGL_LIMIT;
-                if (overMSL && overAGL) reason = `sea level at ${msAltFt} ft and above terrain at ${aglFt} ft`;
-                else if (overMSL) reason = `sea level at ${msAltFt} ft`;
-                else reason = `above terrain at ${aglFt} ft`;
-                const voiceText = `Missile being tracked and targeted by SAM. Reason: ${reason}.`;
-                if (!WARNINGS_DISABLED) try { speakReport(voiceText); } catch (e) { /* ignore */ }
+          } else if (!msViolationRef.current.intercepting) {
+            const terrainCarto2 = C.Cartographic.fromDegrees(ms.lon, ms.lat);
+            const groundH2      = viewer.scene.globe.getHeight(terrainCarto2) ?? TEHRAN_MSL;
+            const aglM          = ms.alt - groundH2;
+            const overAGL       = aglM > 3000 * 0.3048;
+            const overMSL       = ms.alt > 10000 * 0.3048;
+            const tgtRef        = GOV_TARGETS[missileRef.current.targetIdx];
+            const distToTgtM    = distKm(ms.lat, ms.lon, tgtRef.lat, tgtRef.lon) * 1000;
+            const nearTarget    = distToTgtM <= 5 * 1609.344;
+            const overTargetAGL = nearTarget && aglM > 500 * 0.3048;
+            if (overAGL || overMSL || overTargetAGL) {
+              if (!msViolationRef.current.start) {
+                msViolationRef.current.start = now;
+              } else if (now - msViolationRef.current.start >= 3000) {
+                msViolationRef.current.intercepting = true;
+                addLog('⚠ SAM LOCK — INCOMING MISSILE DETECTED', 'bad');
 
-                // Estimate voice duration using same heuristic as speakFemale
-                const voiceDur = Math.max(2000, voiceText.length * 75 + 600);
-                const delayBeforeNoise = voiceDur + 2000; // 2s after voice finishes
+                // Step 1 — voice alert
+                try { speakReport('Incoming SAM detected'); } catch (e) {}
 
+                // Step 2 — alarm beeps ~1.4s after voice starts
                 setTimeout(() => {
-                  // If decommission/testing disabled, skip the SAM intercept behavior
-                  if (typeof DECOMMISSION_DISABLED !== 'undefined' && DECOMMISSION_DISABLED) {
-                    // Keep missile and chase cam fully intact — just reset timers and continue
-                    addLog(`SAM INTERCEPT (SUPPRESSED FOR TESTING) — ${reason}`, 'warn');
-                    msViolationRef.current.start = null;
-                    msViolationRef.current.graceUntil = Date.now() + 30000; // 30s before next check
-                    return;
-                  } else {
-                    // Keep main viewer visible — freeze missile physics but remove PIP + tcam missile
-                    try {
-                      const pip = pipViewerRef.current;
-                      if (pipMissileEnt && pip && !pip.isDestroyed()) pip.entities.remove(pipMissileEnt);
-                      if (missileRef.current) missileRef.current.pipMissileEnt = null;
-                      const tcamV3 = targetCamRef.current;
-                      if (tcamMissileEnt && tcamV3 && !tcamV3.isDestroyed()) tcamV3.entities.remove(tcamMissileEnt);
-                      if (missileRef.current) missileRef.current.tcamMissileEnt = null;
-                      // stop periodic announcements
-                      if (periodicAnnounceRef.current) { clearInterval(periodicAnnounceRef.current); periodicAnnounceRef.current = null; }
-                      // freeze missile state so main model stays at last known position
-                      missileStateRef.current = null;
-                    } catch (e) {}
+                  try {
+                    const actx = new (window.AudioContext || window.webkitAudioContext)();
+                    [0, 0.32, 0.64, 0.96, 1.28].forEach(t => {
+                      const osc = actx.createOscillator();
+                      const g   = actx.createGain();
+                      osc.connect(g); g.connect(actx.destination);
+                      osc.frequency.value = 1100;
+                      g.gain.setValueAtTime(0.65, actx.currentTime + t);
+                      g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + t + 0.26);
+                      osc.start(actx.currentTime + t);
+                      osc.stop(actx.currentTime + t + 0.28);
+                    });
+                    setTimeout(() => { try { actx.close(); } catch (_) {} }, 2500);
+                  } catch (e) {}
+                }, 1400);
 
-                    // White-noise audio removed per user request (leave variables null)
-                    let noiseCtx = null, noiseSrc = null;
-
-                    // Visual: draw static (black/white snow) + red message on PIP HUD
-                    const pipHud = pipHudCanvasRef.current;
-                    if (pipHud) {
-                      const phCtx = pipHud.getContext('2d');
-                      const PW = pipHud.width, PH = pipHud.height;
-                      const iv = setInterval(() => {
-                        // draw static noise (black/white)
-                        const img = phCtx.createImageData(PW, PH);
-                        for (let i = 0; i < img.data.length; i += 4) {
-                          const v = Math.random() < 0.5 ? 0 : 255;
-                          img.data[i] = img.data[i+1] = img.data[i+2] = v;
-                          img.data[i+3] = 255;
-                        }
-                        phCtx.putImageData(img, 0, 0);
-                        // red centered message
-                        phCtx.font = 'bold 20px "Courier New",monospace';
-                        phCtx.fillStyle = 'rgba(255,20,20,1)';
-                        phCtx.textAlign = 'center'; phCtx.textBaseline = 'middle';
-                        phCtx.fillText('MISSILE CONNECTION LOST', PW/2, PH/2);
-                        // also display the specific reason beneath the message
-                        phCtx.font = '12px "Courier New",monospace';
-                        phCtx.fillStyle = 'rgba(255,200,200,1)';
-                        phCtx.textAlign = 'center'; phCtx.textBaseline = 'top';
-                        phCtx.fillText(reason, PW/2, PH/2 + 22);
-                      }, 80);
-
-                      // stop noise after 6 seconds
-                      setTimeout(() => {
-                        clearInterval(iv);
-                        if (noiseSrc) try { noiseSrc.stop(); } catch (_) {}
-                        if (noiseCtx) try { noiseCtx.close(); } catch (_) {}
-                        // clear PIP HUD
-                        phCtx.clearRect(0, 0, PW, PH);
-                      }, 6000);
-                    }
-
-                    addLog(`SAM INTERCEPT — MISSILE LOST — MISSION FAILED — ${reason}`, 'bad');
-                    setMissionComplete(true);
+                // Step 3 — clear missile + Connection Lost after alarm finishes
+                setTimeout(() => {
+                  if (periodicAnnounceRef.current) { clearInterval(periodicAnnounceRef.current); periodicAnnounceRef.current = null; }
+                  const mref = missileRef.current;
+                  if (mref) {
+                    try { viewer.entities.remove(mref.missileEnt); } catch (_) {}
+                    const _pip = pipViewerRef.current;
+                    if (mref.pipMissileEnt && _pip && !_pip.isDestroyed()) { try { _pip.entities.remove(mref.pipMissileEnt); } catch (_) {} }
+                    const _tc = targetCamRef.current;
+                    if (mref.tcamMissileEnt && _tc && !_tc.isDestroyed()) { try { _tc.entities.remove(mref.tcamMissileEnt); } catch (_) {} }
                   }
-                  // clear violation/grace timers
-                  msViolationRef.current.start = null;
-                  msViolationRef.current.graceUntil = null;
-                }, delayBeforeNoise);
+                  missileRef.current      = null;
+                  missileStateRef.current = null;
+                  msViolationRef.current  = { start: null, graceUntil: null, intercepting: false };
+                  setMissileActive(false);
+                  setChaseConnLost(true);
+                }, 3800);
               }
             } else {
               msViolationRef.current.start = null;
             }
           }
-        } catch (e) {
-          // ignore terrain lookup errors
-        }
+        } catch (e) {}
+
 
         const { missileEnt, pipMissileEnt, tcamMissileEnt, targetIdx } = missileRef.current;
         const tgt = GOV_TARGETS[targetIdx];
@@ -1430,6 +1371,23 @@ export default function Level6Game({ playerName, onPlayAgain }) {
             phCtx.fillText(`${aglFt} FT AGL`, PW / 2, by + boxH * 0.70);
           } catch (e) {}
 
+          // Bottom-left box — missile speed in MPH
+          try {
+            const mph    = Math.round(ms2.speed * 2.23694);
+            const boxW = 110, boxH = 44;
+            const bx = 8, by = PH - boxH - 8;
+            phCtx.fillStyle = 'rgba(0,0,0,0.85)';
+            phCtx.fillRect(bx, by, boxW, boxH);
+            phCtx.strokeStyle = 'rgba(255,255,255,0.08)'; phCtx.lineWidth = 1; phCtx.strokeRect(bx, by, boxW, boxH);
+            phCtx.fillStyle = HUD_G;
+            phCtx.font = '10px "Courier New",monospace';
+            phCtx.textAlign = 'center'; phCtx.textBaseline = 'middle';
+            phCtx.fillText('SPEED', bx + boxW / 2, by + boxH * 0.30);
+            phCtx.fillStyle = '#FFFFFF';
+            phCtx.font = 'bold 16px "Courier New",monospace';
+            phCtx.fillText(`${mph} MPH`, bx + boxW / 2, by + boxH * 0.68);
+          } catch (e) {}
+
           // Bottom-right box — missile-to-target distance
           if (distToPip !== null) {
             try {
@@ -1509,18 +1467,18 @@ export default function Level6Game({ playerName, onPlayAgain }) {
 
   return (
     <div className="game-wrap">
-      {briefing && <Level6Briefing onReady={() => setBriefing(false)} />}
+      {briefing && <Level6Briefing playerName={playerName} onReady={() => setBriefing(false)} />}
 
       <div className="hud">
         <div className="hud-brand">TACT/CMD <span>LEVEL 6 — STRATEGIC STRIKE</span></div>
         <div className="hud-stats">
-          <div className="hud-stat"><span className="hud-stat-label">Platform</span><span className="hud-stat-value">F-22A RAPTOR</span></div>
+          <div className="hud-stat"><span className="hud-stat-label">Platform</span><span className="hud-stat-value">B-1B LANCER</span></div>
           <div className="hud-stat"><span className="hud-stat-label">AO</span><span className="hud-stat-value">TEHRAN</span></div>
           <div className="hud-stat"><span className="hud-stat-label">Targets</span><span className="hud-stat-value" style={{ color: targetsRemaining > 0 ? '#FF2020' : '#00FF88' }}>{targetsRemaining} REMAINING</span></div>
           <div className="hud-stat"><span className="hud-stat-label">Missile</span><span className="hud-stat-value" style={{ color: missileActive ? '#FF8C00' : '#00FF88' }}>{missileActive ? 'AWAY' : 'ARMED'}</span></div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.2rem' }}>
-          <div className="hud-player">AGENT <strong>{playerName}</strong></div>
+          <div className="hud-player">COMMANDER <strong>{playerName}</strong></div>
           <div className="hud-connection"><div className="dot-online" />SECURE LINK ACTIVE</div>
         </div>
       </div>
@@ -1559,7 +1517,15 @@ export default function Level6Game({ playerName, onPlayAgain }) {
             ))}
           </div>
 
-          <button className="btn-secondary" style={{ marginTop: 'auto' }} onClick={onPlayAgain}>
+          <button
+            className="btn-secondary"
+            style={{ marginTop: 'auto', color: showAlborz ? '#00FF88' : 'var(--cyan)', borderColor: showAlborz ? 'rgba(0,255,136,.5)' : undefined }}
+            onClick={() => setShowAlborz(v => !v)}
+          >
+            {showAlborz ? '✕ HIDE FLIGHT PATH' : '▶ MISSILE FLIGHT PATH'}
+          </button>
+
+          <button className="btn-secondary" style={{ marginTop: '.5rem' }} onClick={onPlayAgain}>
             ← Return to Missions
           </button>
         </div>
@@ -1685,6 +1651,32 @@ export default function Level6Game({ playerName, onPlayAgain }) {
                 onClick={onPlayAgain}>
                 ← Return to Missions
               </button>
+            </div>
+          )}
+
+          {/* Alborz flight path — bottom-left, same size as top screens */}
+          {showAlborz && (
+            <div style={{
+              position: 'absolute', bottom: 16, left: 16,
+              width: (missileActive || missileEverFired) ? '48%' : '24%',
+              aspectRatio: '16/9',
+              transition: 'width .35s ease',
+              border: '2px solid rgba(0,212,255,.45)',
+              zIndex: 30, overflow: 'hidden',
+              background: '#000',
+            }}>
+              <img
+                src="/ALBORZ Path.png"
+                alt="Alborz missile flight path"
+                style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+              />
+              <div style={{
+                position: 'absolute', top: 4, left: 6, zIndex: 35,
+                fontFamily: 'var(--font-mono)', fontSize: '.5rem', fontWeight: 700,
+                color: 'rgba(0,212,255,.7)', letterSpacing: '.12em',
+              }}>
+                ALBORZ PASS — FLIGHT PATH
+              </div>
             </div>
           )}
         </div>

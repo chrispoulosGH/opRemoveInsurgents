@@ -18,12 +18,29 @@ const HUD_G = '#00FF41';
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 const fmtHdg = h => ((Math.round(h) % 360 + 360) % 360).toString().padStart(3, '0');
 
+// ── Ground targets (Hindu Kush AO) ────────────────────────────────────────────
+const TARGETS_5 = [
+  { name: 'FIREBASE ALPHA',   lat: 34.750, lon: 70.800 },
+  { name: 'FIREBASE BRAVO',   lat: 34.700, lon: 70.880 },
+  { name: 'FIREBASE CHARLIE', lat: 34.770, lon: 70.950 },
+];
+const HIT_M = 50 * 0.9144;  // 50 yards in metres
+const HK_MSL = 2000;        // Hindu Kush fallback terrain height
+
+const distM5 = (la1, lo1, la2, lo2) => {
+  const R = 6371000;
+  const dLat = (la2 - la1) * Math.PI / 180;
+  const dLon = (lo2 - lo1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
 function timestamp() {
   return new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 // ── HUD Canvas Drawing ────────────────────────────────────────────────────────
-function drawHUD(canvas, f) {
+function drawHUD(canvas, f, extra = null) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   const cx = W / 2, cy = H / 2;
@@ -167,19 +184,32 @@ function drawHUD(canvas, f) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('▲  PULL UP  —  LOW ALTITUDE  ▲', cx, H - 52);
   }
+
+  // ── Target / missile status (bottom-left) ────────────────────────────────
+  if (extra) {
+    const { name, bearing, distKm, missileActive, tgtDestroyed } = extra;
+    const brgStr = ((Math.round(bearing) % 360 + 360) % 360).toString().padStart(3, '0');
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.font = 'bold 11px "Courier New",monospace';
+    ctx.fillStyle = tgtDestroyed ? '#00FF88' : '#FF2020';
+    ctx.fillText(`TGT: ${name}`, 14, H - 44);
+    ctx.fillStyle = HUD_G;
+    ctx.fillText(`BRG ${brgStr}°  /  DST ${distKm.toFixed(1)} km`, 14, H - 30);
+    ctx.fillStyle = missileActive ? '#FF8C00' : tgtDestroyed ? '#00FF88' : '#FF2020';
+    ctx.fillText(missileActive ? '◉ MISSILE AWAY' : tgtDestroyed ? '✓ ELIMINATED' : '▶ SPACE TO FIRE', 14, H - 14);
+  }
 }
 
 // ── Briefing ──────────────────────────────────────────────────────────────────
-const NARRATION_5 =
-  'Agent. You are at the controls of an F-22 Raptor, combat loaded and on station. ' +
-  'You are operating over the Hindu Kush — the same airspace as our ground operations. ' +
-  'Your mission: combat air patrol. Hold the sector and demonstrate air superiority. ' +
-  'Move your mouse away from screen centre to control pitch and roll. ' +
-  'Hold W to increase throttle. Hold S to decrease throttle. ' +
-  'Press Space bar to level wings in an emergency. ' +
-  'The aircraft responds to your inputs. Keep it in the air. Good hunting.';
+const buildNarration5 = (name) =>
+  `Commander ${name}. You are at the controls of an F-22 Raptor, combat loaded and on station. ` +
+  'You are operating over the Hindu Kush. Three enemy firebases are active in your sector. ' +
+  'Move your mouse to control pitch and roll. Hold W to increase throttle, S to decrease. ' +
+  'Use Tab to cycle targets. Press Space to fire. ' +
+  'Each missile must impact within fifty yards. Any miss or SAM intercept is mission failure. ' +
+  `Stay low. Good hunting, Commander ${name}.`;
 
-function Level5Briefing({ onReady }) {
+function Level5Briefing({ onReady, playerName }) {
   const [subtitle,  setSubtitle]  = useState('');
   const [countdown, setCountdown] = useState(3);
   const [showGo,    setShowGo]    = useState(false);
@@ -198,10 +228,11 @@ function Level5Briefing({ onReady }) {
     const female = voices.find(v =>
       /female|woman|zira|samantha|karen|victoria|moira|fiona|veena|susan|heather|allison/i.test(v.name)
     ) ?? null;
-    const u = new SpeechSynthesisUtterance(NARRATION_5);
+    const narration = buildNarration5(playerName);
+    const u = new SpeechSynthesisUtterance(narration);
     u.rate = 0.92; u.pitch = 0.88; u.volume = 0.9;
     if (female) u.voice = female;
-    u.onboundary = e => { if (e.name === 'word') setSubtitle(NARRATION_5.slice(0, e.charIndex + e.charLength)); };
+    u.onboundary = e => { if (e.name === 'word') setSubtitle(narration.slice(0, e.charIndex + e.charLength)); };
     u.onend = () => setPhase('countdown');
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
@@ -246,11 +277,12 @@ function Level5Briefing({ onReady }) {
           {[
             ['PLATFORM',  'F-22A RAPTOR', 'var(--cyan)'],
             ['AO',        'HINDU KUSH / NANGARHAR', 'rgba(255,255,255,.7)'],
-            ['ALTITUDE',  '15 750 FT MSL', 'var(--amber)'],
-            ['SPEED',     '380 KIAS / M 0.57', 'var(--amber)'],
+            ['TARGETS',   '3 ENEMY FIREBASES', '#FF2020'],
             ['CONTROLS',  'MOUSE — PITCH / ROLL', 'var(--cyan)'],
             ['THROTTLE',  'W = INCREASE  /  S = DECREASE', 'var(--cyan)'],
-            ['EMERGENCY', 'SPACEBAR — LEVEL WINGS', '#FF8800'],
+            ['Tab',       'CYCLE TARGETS', '#00FF88'],
+            ['Space',     'FIRE MISSILE', '#FF2020'],
+            ['ACCURACY',  '50 YARDS — MISS = MISSION FAILURE', '#FF8800'],
           ].map(([k, v, col]) => (
             <div key={k} style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
@@ -307,8 +339,25 @@ export default function Level5Game({ playerName, onPlayAgain }) {
   });
 
   const mouseRef = useRef({ nx: 0, ny: 0 });  // normalised -1..1
-  const keysRef  = useRef({ w: false, s: false, space: false });
+  const keysRef  = useRef({ w: false, s: false });
   const rafRef   = useRef(null);
+
+  // Missile / targeting
+  const selectedTgtRef  = useRef(0);
+  const missileStateRef = useRef(null);
+  const missileEntRef   = useRef(null);
+  const tgtEntitiesRef  = useRef([]);
+  const msViolRef       = useRef({ start: null, intercepting: false });
+  const destroyedRef    = useRef(new Set());
+  const fireMissileRef  = useRef(false);
+  const missionEndRef   = useRef(false);
+  const failCountRef    = useRef(0);
+
+  const [selectedTgt,   setSelectedTgt]   = useState(0);
+  const [strikes,       setStrikes]       = useState(3);   // remaining failures allowed
+  const [missionFailed, setMissionFailed] = useState(false);
+  const [failReason,    setFailReason]    = useState('');
+  const [missionSuccess,setMissionSuccess]= useState(false);
 
   const [briefing, setBriefing] = useState(true);
   const [crashed,  setCrashed]  = useState(false);
@@ -342,24 +391,42 @@ export default function Level5Game({ playerName, onPlayAgain }) {
       creditContainer:      creditDiv,
     });
 
+    C.RequestScheduler.maximumRequestsPerServer = 18;
+
     viewer.imageryLayers.addImageryProvider(
-      new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 23 })
+      new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 19 })
     );
     viewer.scene.globe.depthTestAgainstTerrain = true;
+    viewer.scene.globe.maximumScreenSpaceError = 4;
+    viewer.scene.globe.tileCacheSize           = 500;
     viewer.scene.fog.enabled = true;
-    viewer.scene.fog.density = 0.00008;
+    viewer.scene.fog.density = 0.00012;
 
     // Disable all Cesium mouse navigation — we drive the camera ourselves
     const ctrl = viewer.scene.screenSpaceCameraController;
     ctrl.enableRotate = ctrl.enableTranslate = ctrl.enableZoom = false;
     ctrl.enableTilt   = ctrl.enableLook      = false;
 
-    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN).then(tp => {
+    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN, {
+      requestVertexNormals: false,
+      requestWaterMask:     false,
+    }).then(tp => {
       if (!viewer.isDestroyed()) {
         viewer.terrainProvider = tp;
         addLog('Terrain loaded.', 'info');
       }
     }).catch(() => {});
+
+    // Target markers — clamped to terrain, always visible
+    tgtEntitiesRef.current = TARGETS_5.map(tgt => viewer.entities.add({
+      position: C.Cartesian3.fromDegrees(tgt.lon, tgt.lat, 0),
+      point: {
+        pixelSize: 14, color: C.Color.RED,
+        outlineColor: C.Color.WHITE, outlineWidth: 2,
+        heightReference: C.HeightReference.CLAMP_TO_GROUND,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    }));
 
     viewerRef.current = viewer;
     return () => { if (!viewer.isDestroyed()) viewer.destroy(); };
@@ -384,14 +451,21 @@ export default function Level5Game({ playerName, onPlayAgain }) {
   // ── Keyboard ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const onDown = e => {
-      if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp')    keysRef.current.w     = true;
-      if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown')   keysRef.current.s     = true;
-      if (e.key === ' ')                                              keysRef.current.space = true;
+      if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp')    keysRef.current.w = true;
+      if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown')  keysRef.current.s = true;
+      if (e.key === ' ') { e.preventDefault(); fireMissileRef.current = true; }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        setSelectedTgt(prev => {
+          const next = (prev + 1) % TARGETS_5.length;
+          selectedTgtRef.current = next;
+          return next;
+        });
+      }
     };
     const onUp = e => {
-      if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp')    keysRef.current.w     = false;
-      if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown')   keysRef.current.s     = false;
-      if (e.key === ' ')                                              keysRef.current.space = false;
+      if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp')    keysRef.current.w = false;
+      if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown')  keysRef.current.s = false;
     };
     window.addEventListener('keydown', onDown);
     window.addEventListener('keyup',   onUp);
@@ -406,6 +480,7 @@ export default function Level5Game({ playerName, onPlayAgain }) {
     const animate = time => {
       const viewer = viewerRef.current;
       if (!viewer || viewer.isDestroyed()) return;
+      if (missionEndRef.current) return;
       const C = window.Cesium;
 
       const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0.016;
@@ -427,9 +502,6 @@ export default function Level5Game({ playerName, onPlayAgain }) {
       };
       const rollStick  =  dz(m.nx);   // +1 = roll right
       const pitchStick = -dz(m.ny);   // +1 = nose up (inverted Y)
-
-      // SPACE = emergency wings-level / pitch recover
-      if (k.space) { f.roll *= 0.88; f.pitch *= 0.92; }
 
       // ── Roll & pitch update ───────────────────────────────────────────────
       f.roll  = clamp(f.roll  + rollStick  * 95 * dt, -85, 85);
@@ -462,9 +534,147 @@ export default function Level5Game({ playerName, onPlayAgain }) {
 
       // ── Crash detection ───────────────────────────────────────────────────
       if (f.altM <= MIN_ALT_M + 5) {
+        missionEndRef.current = true;
         setCrashed(true);
         addLog('⚠ TERRAIN IMPACT — AIRCRAFT LOST', 'warn');
         return;
+      }
+
+      // ── Fire missile ───────────────────────────────────────────────────────
+      if (fireMissileRef.current) {
+        fireMissileRef.current = false;
+        const tIdx = selectedTgtRef.current;
+        if (!missileStateRef.current && !destroyedRef.current.has(tIdx) && !missionEndRef.current) {
+          const hdgR = f.heading * Math.PI / 180;
+          missileStateRef.current = {
+            lat: f.lat + 50 * Math.cos(hdgR) / 111320,
+            lon: f.lon + 50 * Math.sin(hdgR) / (111320 * Math.cos(f.lat * Math.PI / 180)),
+            alt: f.altM, speed: 900, targetIdx: tIdx,
+          };
+          msViolRef.current = { start: null, intercepting: false };
+          const _mp = new C.Cartesian3();
+          missileEntRef.current = viewer.entities.add({
+            position: new C.CallbackProperty(() => {
+              const ms2 = missileStateRef.current;
+              if (!ms2) return undefined;
+              return C.Cartesian3.fromDegrees(ms2.lon, ms2.lat, ms2.alt, C.Ellipsoid.WGS84, _mp);
+            }, false),
+            point: {
+              pixelSize: 7, color: C.Color.ORANGERED,
+              outlineColor: C.Color.WHITE, outlineWidth: 1,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            },
+          });
+          addLog(`JDAM AWAY — TARGET: ${TARGETS_5[tIdx].name}`, 'warn');
+        }
+      }
+
+      // ── Missile physics ────────────────────────────────────────────────────
+      const ms = missileStateRef.current;
+      if (ms && !msViolRef.current.intercepting) {
+        const tgt = TARGETS_5[ms.targetIdx];
+        const distToTgt = distM5(ms.lat, ms.lon, tgt.lat, tgt.lon);
+
+        const bearRad = Math.atan2(
+          (tgt.lon - ms.lon) * Math.cos(ms.lat * Math.PI / 180),
+          tgt.lat - ms.lat
+        );
+        const step = Math.min(ms.speed * dt, distToTgt + 1);
+        ms.lat += step * Math.cos(bearRad) / 111320;
+        ms.lon += step * Math.sin(bearRad) / (111320 * Math.cos(ms.lat * Math.PI / 180));
+
+        const mCarto   = C.Cartographic.fromDegrees(ms.lon, ms.lat);
+        const groundH  = viewer.scene.globe.getHeight(mCarto)  ?? HK_MSL;
+        const tCarto   = C.Cartographic.fromDegrees(tgt.lon, tgt.lat);
+        const tGroundH = viewer.scene.globe.getHeight(tCarto) ?? HK_MSL;
+        if (distToTgt > 10) {
+          const altDrop = (ms.alt - (tGroundH + 20)) / distToTgt * step * 1.3;
+          ms.alt = Math.max(ms.alt - altDrop, tGroundH + 5);
+        }
+
+        // ── SAM check ────────────────────────────────────────────────────────
+        try {
+          const now  = Date.now();
+          const aglM = ms.alt - groundH;
+          const over3kAGL    = aglM > 3000 * 0.3048;
+          const over10kMSL   = ms.alt > 10000 * 0.3048;
+          const over500near  = distToTgt <= 5 * 1609.344 && aglM > 500 * 0.3048;
+          if (over3kAGL || over10kMSL || over500near) {
+            if (!msViolRef.current.start) {
+              msViolRef.current.start = now;
+            } else if (now - msViolRef.current.start >= 3000) {
+              msViolRef.current.intercepting = true;
+              addLog('⚠ SAM LOCK — INCOMING MISSILE DETECTED', 'bad');
+              try {
+                window.speechSynthesis?.cancel();
+                const u = new SpeechSynthesisUtterance('Incoming SAM detected');
+                u.rate = 0.88; u.pitch = 0.75;
+                window.speechSynthesis?.speak(u);
+              } catch (_) {}
+              setTimeout(() => {
+                try {
+                  const actx = new (window.AudioContext || window.webkitAudioContext)();
+                  [0, 0.32, 0.64, 0.96, 1.28].forEach(t => {
+                    const osc = actx.createOscillator(), g = actx.createGain();
+                    osc.connect(g); g.connect(actx.destination);
+                    osc.frequency.value = 1100;
+                    g.gain.setValueAtTime(0.65, actx.currentTime + t);
+                    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + t + 0.26);
+                    osc.start(actx.currentTime + t); osc.stop(actx.currentTime + t + 0.28);
+                  });
+                  setTimeout(() => { try { actx.close(); } catch (_) {} }, 2500);
+                } catch (_) {}
+              }, 1400);
+              setTimeout(() => {
+                if (missileEntRef.current) { try { viewer.entities.remove(missileEntRef.current); } catch (_) {} missileEntRef.current = null; }
+                missileStateRef.current = null;
+                msViolRef.current = { start: null, intercepting: false };
+                failCountRef.current += 1;
+                setStrikes(3 - failCountRef.current);
+                if (failCountRef.current >= 3) {
+                  missionEndRef.current = true;
+                  setFailReason('MISSILE INTERCEPTED BY SAM — 3 STRIKES');
+                  setMissionFailed(true);
+                } else {
+                  addLog(`STRIKE ${failCountRef.current}/3 — MISSILE INTERCEPTED — RE-ARM AND RE-ENGAGE`, 'bad');
+                }
+              }, 3800);
+            }
+          } else {
+            msViolRef.current.start = null;
+          }
+        } catch (_) {}
+
+        // ── Hit / miss detection ──────────────────────────────────────────────
+        if (distToTgt < ms.speed * dt * 1.5 || ms.alt - groundH < 15) {
+          const hitDist = distM5(ms.lat, ms.lon, tgt.lat, tgt.lon);
+          if (missileEntRef.current) { try { viewer.entities.remove(missileEntRef.current); } catch (_) {} missileEntRef.current = null; }
+          const capturedTgt = ms.targetIdx;
+          missileStateRef.current = null;
+          msViolRef.current = { start: null, intercepting: false };
+
+          if (hitDist <= HIT_M) {
+            destroyedRef.current.add(capturedTgt);
+            const tEnt = tgtEntitiesRef.current[capturedTgt];
+            if (tEnt) tEnt.point.color = new C.ConstantProperty(C.Color.fromCssColorString('#00FF88').withAlpha(0.6));
+            addLog(`${tgt.name} — TARGET ELIMINATED ✓`, 'info');
+            if (destroyedRef.current.size >= TARGETS_5.length) {
+              missionEndRef.current = true;
+              setMissionSuccess(true);
+              addLog('ALL TARGETS ELIMINATED — MISSION COMPLETE', 'warn');
+            }
+          } else {
+            failCountRef.current += 1;
+            setStrikes(3 - failCountRef.current);
+            if (failCountRef.current >= 3) {
+              missionEndRef.current = true;
+              setFailReason(`MISSILE MISSED — ${Math.round(hitDist)}m FROM TARGET — 3 STRIKES`);
+              setMissionFailed(true);
+            } else {
+              addLog(`STRIKE ${failCountRef.current}/3 — MISSED (${Math.round(hitDist)}m off) — RE-ARM AND RE-ENGAGE`, 'bad');
+            }
+          }
+        }
       }
 
       // ── Cesium camera (cockpit view) ──────────────────────────────────────
@@ -484,7 +694,18 @@ export default function Level5Game({ playerName, onPlayAgain }) {
           hud.width  = hud.offsetWidth  || window.innerWidth;
           hud.height = hud.offsetHeight || window.innerHeight;
         }
-        drawHUD(hud, { ...f });
+        const selObj = TARGETS_5[selectedTgtRef.current];
+        const bRad = Math.atan2(
+          (selObj.lon - f.lon) * Math.cos(f.lat * Math.PI / 180),
+          selObj.lat - f.lat
+        );
+        drawHUD(hud, { ...f }, {
+          name: selObj.name,
+          bearing: ((bRad * 180 / Math.PI) + 360) % 360,
+          distKm: distM5(f.lat, f.lon, selObj.lat, selObj.lon) / 1000,
+          missileActive: !!missileStateRef.current,
+          tgtDestroyed: destroyedRef.current.has(selectedTgtRef.current),
+        });
       }
 
       rafRef.current = requestAnimationFrame(animate);
@@ -497,7 +718,7 @@ export default function Level5Game({ playerName, onPlayAgain }) {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="game-wrap">
-      {briefing && <Level5Briefing onReady={() => setBriefing(false)} />}
+      {briefing && <Level5Briefing playerName={playerName} onReady={() => setBriefing(false)} />}
 
       <div className="hud">
         <div className="hud-brand">
@@ -510,16 +731,20 @@ export default function Level5Game({ playerName, onPlayAgain }) {
             <span className="hud-stat-value">F-22A RAPTOR</span>
           </div>
           <div className="hud-stat">
-            <span className="hud-stat-label">AO</span>
-            <span className="hud-stat-value">HINDU KUSH</span>
+            <span className="hud-stat-label">Targets</span>
+            <span className="hud-stat-value" style={{ color: missionSuccess ? '#00FF88' : '#FF2020' }}>
+              {TARGETS_5.length} FIREBASES
+            </span>
           </div>
           <div className="hud-stat">
-            <span className="hud-stat-label">Mission</span>
-            <span className="hud-stat-value">OP-CROSSBOW</span>
+            <span className="hud-stat-label">Strikes</span>
+            <span className="hud-stat-value" style={{ color: strikes <= 1 ? '#FF2020' : strikes === 2 ? 'var(--amber)' : '#00FF88' }}>
+              {strikes} / 3 REMAINING
+            </span>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.2rem' }}>
-          <div className="hud-player">AGENT <strong>{playerName}</strong></div>
+          <div className="hud-player">COMMANDER <strong>{playerName}</strong></div>
           <div className="hud-connection"><div className="dot-online" />SECURE LINK ACTIVE</div>
         </div>
       </div>
@@ -534,7 +759,8 @@ export default function Level5Game({ playerName, onPlayAgain }) {
               ['Mouse',  'Pitch / Roll'],
               ['W / ↑',  'Throttle Up'],
               ['S / ↓',  'Throttle Down'],
-              ['Space',  'Level Wings'],
+              ['Tab',    'Cycle Targets'],
+              ['Space',  'Fire Missile'],
             ].map(([k, v]) => (
               <div className="intel-row" key={k}>
                 <span className="intel-key" style={{ color: 'var(--cyan)' }}>{k}</span>
@@ -610,18 +836,57 @@ export default function Level5Game({ playerName, onPlayAgain }) {
               }}>
                 AIRCRAFT LOST
               </div>
-              <div style={{
-                marginTop: '1rem', fontFamily: 'var(--font-mono)',
-                fontSize: '.9rem', color: '#FF6060', letterSpacing: '.15em',
-              }}>
+              <div style={{ marginTop: '1rem', fontFamily: 'var(--font-mono)', fontSize: '.9rem', color: '#FF6060', letterSpacing: '.15em' }}>
                 TERRAIN IMPACT — EJECTION FAILED
               </div>
-              <button
-                className="btn-secondary"
-                style={{ marginTop: '2rem', color: 'var(--cyan)', borderColor: 'rgba(0,212,255,.4)' }}
-                onClick={onPlayAgain}
-              >
-                ← Return to Missions
+              <button className="btn-secondary" style={{ marginTop: '2rem', color: 'var(--cyan)', borderColor: 'rgba(0,212,255,.4)' }} onClick={onPlayAgain}>
+                ← Return to Base
+              </button>
+            </div>
+          )}
+
+          {/* Mission failed overlay */}
+          {missionFailed && (
+            <div style={{
+              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', zIndex: 21,
+              background: 'rgba(0,0,0,.88)',
+            }}>
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: '2.4rem', fontWeight: 700,
+                color: '#FF2020', letterSpacing: '.2em', textAlign: 'center',
+                textShadow: '0 0 30px rgba(255,32,32,.8)',
+              }}>
+                MISSION FAILED
+              </div>
+              <div style={{ marginTop: '1rem', fontFamily: 'var(--font-mono)', fontSize: '.9rem', color: '#FF6060', letterSpacing: '.15em', textAlign: 'center', maxWidth: '36rem' }}>
+                {failReason}
+              </div>
+              <button className="btn-secondary" style={{ marginTop: '2rem', color: 'var(--cyan)', borderColor: 'rgba(0,212,255,.4)' }} onClick={onPlayAgain}>
+                ← Return to Base
+              </button>
+            </div>
+          )}
+
+          {/* Mission success overlay */}
+          {missionSuccess && (
+            <div style={{
+              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', zIndex: 21,
+              background: 'rgba(0,0,0,.78)',
+            }}>
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: '2.4rem', fontWeight: 700,
+                color: '#00FF88', letterSpacing: '.2em', textAlign: 'center',
+                textShadow: '0 0 30px rgba(0,255,136,.7)',
+              }}>
+                MISSION COMPLETE
+              </div>
+              <div style={{ marginTop: '1rem', fontFamily: 'var(--font-mono)', fontSize: '.9rem', color: 'rgba(255,255,255,.7)', letterSpacing: '.15em' }}>
+                ALL FIREBASES ELIMINATED — RTB
+              </div>
+              <button className="btn-secondary" style={{ marginTop: '2rem', color: 'var(--cyan)', borderColor: 'rgba(0,212,255,.4)' }} onClick={onPlayAgain}>
+                ← Return to Base
               </button>
             </div>
           )}

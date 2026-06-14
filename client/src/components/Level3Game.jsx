@@ -451,8 +451,8 @@ const BRIEF_IMAGES = [
   { src: '/vent_3.png', label: 'VENTILATION SHAFT — CHARLIE' },
 ];
 
-const NARRATION_SCRIPT =
-  'Agent. Listen carefully. ' +
+const buildNarration3 = (name) =>
+  `Commander ${name}. Listen carefully. ` +
   'Intelligence has confirmed enriched uranium stockpiles stored deep underground ' +
   'in Nangarhar Province, Afghanistan. ' +
   'Three ventilation shafts provide the only access to the facility. ' +
@@ -462,9 +462,9 @@ const NARRATION_SCRIPT =
   'You have three bombs and three targets. ' +
   'All three must be destroyed for mission success. ' +
   'You have ten minutes. There is no margin for error. ' +
-  'Use pan and zoom controls to visually locate targets. Good hunting.';
+  `Use pan and zoom controls to visually locate targets. Good hunting, Commander ${name}.`;
 
-function Level3Briefing({ onReady }) {
+function Level3Briefing({ onReady, playerName }) {
   const [subtitle,  setSubtitle]  = useState('');
   const [countdown, setCountdown] = useState(3);
   const [showGo,    setShowGo]    = useState(false);
@@ -484,13 +484,14 @@ function Level3Briefing({ onReady }) {
     const female = voices.find(v =>
       /female|woman|zira|samantha|karen|victoria|moira|fiona|veena|susan|heather|allison/i.test(v.name)
     ) ?? null;
-    const u = new SpeechSynthesisUtterance(NARRATION_SCRIPT);
+    const narration = buildNarration3(playerName);
+    const u = new SpeechSynthesisUtterance(narration);
     u.rate   = 0.92;
     u.pitch  = 0.88;
     u.volume = 0.9;
     if (female) u.voice = female;
     u.onboundary = (e) => {
-      if (e.name === 'word') setSubtitle(NARRATION_SCRIPT.slice(0, e.charIndex + e.charLength));
+      if (e.name === 'word') setSubtitle(narration.slice(0, e.charIndex + e.charLength));
     };
     u.onend = () => setPhase('countdown');
     window.speechSynthesis.cancel();
@@ -1142,7 +1143,7 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
   return (
     <div className="game-wrap">
 
-      {briefing && <Level3Briefing onReady={() => setBriefing(false)} />}
+      {briefing && <Level3Briefing playerName={playerName} onReady={() => setBriefing(false)} />}
 
       <div className="hud">
         <div className="hud-brand">
@@ -1165,7 +1166,7 @@ export default function Level3Game({ playerName, onPlayAgain, onMissionComplete 
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.2rem' }}>
-          <div className="hud-player">AGENT <strong>{playerName}</strong></div>
+          <div className="hud-player">COMMANDER <strong>{playerName}</strong></div>
           <div className="hud-connection"><div className="dot-online" />SECURE LINK ACTIVE</div>
         </div>
       </div>

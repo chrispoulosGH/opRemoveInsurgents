@@ -238,7 +238,7 @@ export default function HostageGame({
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.2rem' }}>
-          <div className="hud-player">AGENT <strong>{playerName}</strong></div>
+          <div className="hud-player">COMMANDER <strong>{playerName}</strong></div>
           <div className="hud-connection"><div className="dot-online" />SECURE LINK ACTIVE</div>
         </div>
       </div>
