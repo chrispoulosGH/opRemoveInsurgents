@@ -585,10 +585,7 @@ export default function Level6Game({ playerName, onPlayAgain }) {
     ctrl.enableRotate = ctrl.enableTranslate = ctrl.enableZoom = false;
     ctrl.enableTilt   = ctrl.enableLook      = false;
 
-    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN, {
-      requestVertexNormals: false,
-      requestWaterMask:     false,
-    }).then(tp => {
+    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN).then(tp => {
       if (!viewer.isDestroyed()) viewer.terrainProvider = tp;
     }).catch(() => {});
 
@@ -652,10 +649,7 @@ export default function Level6Game({ playerName, onPlayAgain }) {
     pipCtrl.enableRotate = pipCtrl.enableTranslate = pipCtrl.enableZoom = false;
     pipCtrl.enableTilt   = pipCtrl.enableLook      = false;
 
-    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN, {
-      requestVertexNormals: false,
-      requestWaterMask:     false,
-    }).then(tp => {
+    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN).then(tp => {
       if (!pip.isDestroyed()) pip.terrainProvider = tp;
     }).catch(() => {});
 
@@ -749,10 +743,7 @@ export default function Level6Game({ playerName, onPlayAgain }) {
     tc.enableRotate = tc.enableTranslate = tc.enableZoom = false;
     tc.enableTilt   = tc.enableLook      = false;
 
-    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN, {
-      requestVertexNormals: false,
-      requestWaterMask:     false,
-    }).then(tp => {
+    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN).then(tp => {
       if (!tcam.isDestroyed()) tcam.terrainProvider = tp;
     }).catch(() => {});
 

@@ -407,10 +407,7 @@ export default function Level5Game({ playerName, onPlayAgain }) {
     ctrl.enableRotate = ctrl.enableTranslate = ctrl.enableZoom = false;
     ctrl.enableTilt   = ctrl.enableLook      = false;
 
-    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN, {
-      requestVertexNormals: false,
-      requestWaterMask:     false,
-    }).then(tp => {
+    C.ArcGISTiledElevationTerrainProvider.fromUrl(ARCGIS_TRN).then(tp => {
       if (!viewer.isDestroyed()) {
         viewer.terrainProvider = tp;
         addLog('Terrain loaded.', 'info');
