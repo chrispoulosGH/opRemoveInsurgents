@@ -576,8 +576,8 @@ export default function Level6Game({ playerName, onPlayAgain }) {
       new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 19 })
     );
     viewer.scene.globe.depthTestAgainstTerrain = true;
-    viewer.scene.globe.maximumScreenSpaceError = 4;   // default 2; halves tile count
-    viewer.scene.globe.tileCacheSize           = 500; // default 100
+    viewer.scene.globe.maximumScreenSpaceError = 2;   // keep at 2 — accurate getHeight() for collision
+    viewer.scene.globe.tileCacheSize           = 500;
     viewer.scene.fog.enabled  = true;
     viewer.scene.fog.density  = 0.00012; // slightly denser = fewer far tiles needed
 
@@ -1174,7 +1174,7 @@ export default function Level6Game({ playerName, onPlayAgain }) {
           // ── TERRAIN COLLISION — sample actual ground height ────────────────
           const terrainCarto = C.Cartographic.fromDegrees(ms.lon, ms.lat);
           const groundH = viewer.scene.globe.getHeight(terrainCarto);
-          if (groundH !== undefined && ms.alt <= groundH + 20) {
+          if (groundH !== undefined && ms.alt <= groundH + 8) {
             const terrG = viewer.scene.globe.getHeight(terrainCarto) ?? TEHRAN_MSL;
             triggerMoabExplosion(viewer, C, ms.lat, ms.lon, addLog, 'TERRAIN', containerRef.current, terrG);
             const _pip2 = pipViewerRef.current;
