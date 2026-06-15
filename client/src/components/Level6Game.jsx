@@ -524,9 +524,10 @@ export default function Level6Game({ playerName, onPlayAgain }) {
 
   // missileRef: entity + targeting info
   // missileStateRef: live physics state for the guided missile
-  const missileRef      = useRef(null);
-  const missileStateRef = useRef(null);
-  const msViolationRef  = useRef({ start: null, graceUntil: null, intercepting: false });
+  const missileRef         = useRef(null);
+  const missileStateRef    = useRef(null);
+  const msViolationRef     = useRef({ start: null, graceUntil: null, intercepting: false });
+  const rafFrameCountRef   = useRef(0);
   // pendingLaunchRef removed: immediate launch on confirm (second Space)
   const periodicAnnounceRef = useRef(null);
   const awaitLaunchConfirmRef = useRef(false);
@@ -599,16 +600,10 @@ export default function Level6Game({ playerName, onPlayAgain }) {
     });
 
 
-    // Cockpit camera + missile physics — both in Cesium's render pipeline for perfect frame sync
+    // Cockpit camera — preUpdate fires only when viewer.render() is called by rAF loop
     const _cockpitPos = new C.Cartesian3();
-    const _DZ = 0.06;
-    const _dz = v => { const s = Math.sign(v), a = Math.abs(v); return a < _DZ ? 0 : s * (a - _DZ) / (1 - _DZ); };
-    let _lastPhysMs = null;
-
     const onPreUpdate = () => {
       if (viewer.isDestroyed()) return;
-
-      // Cockpit camera
       const f = flightRef.current;
       C.Cartesian3.fromDegrees(f.lon, f.lat, f.altM + 3, C.Ellipsoid.WGS84, _cockpitPos);
       viewer.camera.setView({
@@ -619,22 +614,8 @@ export default function Level6Game({ playerName, onPlayAgain }) {
           roll:    C.Math.toRadians(f.roll),
         },
       });
-
-      // Missile position integration — runs here so physics and render are always in step
-      const now = Date.now();
-      const dt  = _lastPhysMs ? Math.min((now - _lastPhysMs) / 1000, 0.033) : 0.016;
-      _lastPhysMs = now;
-      if (!missileRef.current || !missileStateRef.current) return;
-      const ms = missileStateRef.current;
-      const m  = mouseRef.current;
-      ms.heading = ((ms.heading + _dz(m.nx) * 70 * dt) + 360) % 360;
-      ms.pitch   = clamp(ms.pitch + (-_dz(m.ny)) * 30 * dt, -60, 40);
-      ms.roll    = ms.roll + (-_dz(m.nx) * 55 - ms.roll) * 5 * dt;
-      const mHdgRad = ms.heading * Math.PI / 180;
-      ms.lat += ms.speed * dt * Math.cos(mHdgRad) / 111320;
-      ms.lon += ms.speed * dt * Math.sin(mHdgRad) / (111320 * Math.cos(ms.lat * Math.PI / 180));
-      ms.alt  = ms.alt + ms.speed * Math.sin(ms.pitch * Math.PI / 180) * dt;
     };
+    viewer.useDefaultRenderLoop = false;  // rAF loop drives all three viewers at 80/10/10
     viewer.scene.preUpdate.addEventListener(onPreUpdate);
 
     viewerRef.current = viewer;
@@ -661,9 +642,10 @@ export default function Level6Game({ playerName, onPlayAgain }) {
     pip.imageryLayers.addImageryProvider(
       new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 17 })
     );
+    pip.useDefaultRenderLoop = false;   // driven manually at 20fps from main viewer
     pip.scene.globe.depthTestAgainstTerrain = true;
-    pip.scene.globe.maximumScreenSpaceError = 6;
-    pip.scene.globe.tileCacheSize           = 300;
+    pip.scene.globe.maximumScreenSpaceError = 12;
+    pip.scene.globe.tileCacheSize           = 150;
     pip.scene.fog.enabled = false;
 
     const pipCtrl = pip.scene.screenSpaceCameraController;
@@ -756,9 +738,10 @@ export default function Level6Game({ playerName, onPlayAgain }) {
     tcam.imageryLayers.addImageryProvider(
       new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 17 })
     );
+    tcam.useDefaultRenderLoop = false;   // driven manually at 20fps from main viewer
     tcam.scene.globe.depthTestAgainstTerrain = false;
-    tcam.scene.globe.maximumScreenSpaceError = 6;
-    tcam.scene.globe.tileCacheSize           = 300;
+    tcam.scene.globe.maximumScreenSpaceError = 12;
+    tcam.scene.globe.tileCacheSize           = 150;
     tcam.scene.fog.enabled = false;
     const tc = tcam.scene.screenSpaceCameraController;
     tc.enableRotate = tc.enableTranslate = tc.enableZoom = false;
@@ -1048,9 +1031,18 @@ export default function Level6Game({ playerName, onPlayAgain }) {
       // Keep heading fixed (start heading)
       f.heading = START_HDG;
 
-      // ── Missile SAM / hit / terrain checks (physics runs in preUpdate) ────
-      if (missileRef.current) {
+      // ── Missile physics (60fps) + SAM / hit / terrain checks ─────────────
+      if (missileRef.current && missileStateRef.current) {
         const ms = missileStateRef.current;
+        const DZ = 0.06;
+        const dz = v => { const s = Math.sign(v), a = Math.abs(v); return a < DZ ? 0 : s * (a - DZ) / (1 - DZ); };
+        ms.heading = ((ms.heading + dz(m.nx) * 70 * dt) + 360) % 360;
+        ms.pitch   = clamp(ms.pitch + (-dz(m.ny)) * 30 * dt, -60, 40);
+        ms.roll    = ms.roll + (-dz(m.nx) * 55 - ms.roll) * 5 * dt;
+        const mHdgRad = ms.heading * Math.PI / 180;
+        ms.lat += ms.speed * dt * Math.cos(mHdgRad) / 111320;
+        ms.lon += ms.speed * dt * Math.sin(mHdgRad) / (111320 * Math.cos(ms.lat * Math.PI / 180));
+        ms.alt  = ms.alt + ms.speed * Math.sin(ms.pitch * Math.PI / 180) * dt;
 
         // ── SAM intercept: any condition held for ≥3 continuous seconds ────────────
         // • >3000 ft AGL anywhere
@@ -1432,6 +1424,20 @@ export default function Level6Game({ playerName, onPlayAgain }) {
           tc.textAlign = 'center'; tc.textBaseline = 'top';
           tc.fillText(selTgt.name, x, y + BH / 2 + 4);
         }
+      }
+
+      // ── 80 / 10 / 10 viewer rendering ────────────────────────────────────
+      // Chase cam gets 8 of every 10 rAF frames; main cockpit and target cam
+      // each get 1, staggered so no two heavy renders happen in the same frame.
+      const fc = (rafFrameCountRef.current = (rafFrameCountRef.current + 1) % 10);
+      if (fc < 8) {                                      // chase cam  80 %
+        const pip2 = pipViewerRef.current;
+        if (pip2 && !pip2.isDestroyed()) pip2.render();
+      } else if (fc === 8) {                             // main view  10 %
+        if (!viewer.isDestroyed()) viewer.render();
+      } else {                                           // target cam 10 %
+        const tcam2 = targetCamRef.current;
+        if (tcam2 && !tcam2.isDestroyed()) tcam2.render();
       }
 
       rafRef.current = requestAnimationFrame(animate);
