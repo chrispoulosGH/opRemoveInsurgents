@@ -599,10 +599,16 @@ export default function Level6Game({ playerName, onPlayAgain }) {
     });
 
 
-    // Cockpit camera — runs in Cesium's render pipeline for perfect sync
+    // Cockpit camera + missile physics — both in Cesium's render pipeline for perfect frame sync
     const _cockpitPos = new C.Cartesian3();
+    const _DZ = 0.06;
+    const _dz = v => { const s = Math.sign(v), a = Math.abs(v); return a < _DZ ? 0 : s * (a - _DZ) / (1 - _DZ); };
+    let _lastPhysMs = null;
+
     const onPreUpdate = () => {
       if (viewer.isDestroyed()) return;
+
+      // Cockpit camera
       const f = flightRef.current;
       C.Cartesian3.fromDegrees(f.lon, f.lat, f.altM + 3, C.Ellipsoid.WGS84, _cockpitPos);
       viewer.camera.setView({
@@ -613,6 +619,21 @@ export default function Level6Game({ playerName, onPlayAgain }) {
           roll:    C.Math.toRadians(f.roll),
         },
       });
+
+      // Missile position integration — runs here so physics and render are always in step
+      const now = Date.now();
+      const dt  = _lastPhysMs ? Math.min((now - _lastPhysMs) / 1000, 0.033) : 0.016;
+      _lastPhysMs = now;
+      if (!missileRef.current || !missileStateRef.current) return;
+      const ms = missileStateRef.current;
+      const m  = mouseRef.current;
+      ms.heading = ((ms.heading + _dz(m.nx) * 70 * dt) + 360) % 360;
+      ms.pitch   = clamp(ms.pitch + (-_dz(m.ny)) * 30 * dt, -60, 40);
+      ms.roll    = ms.roll + (-_dz(m.nx) * 55 - ms.roll) * 5 * dt;
+      const mHdgRad = ms.heading * Math.PI / 180;
+      ms.lat += ms.speed * dt * Math.cos(mHdgRad) / 111320;
+      ms.lon += ms.speed * dt * Math.sin(mHdgRad) / (111320 * Math.cos(ms.lat * Math.PI / 180));
+      ms.alt  = ms.alt + ms.speed * Math.sin(ms.pitch * Math.PI / 180) * dt;
     };
     viewer.scene.preUpdate.addEventListener(onPreUpdate);
 
@@ -891,18 +912,6 @@ export default function Level6Game({ playerName, onPlayAgain }) {
             speed: MISSILE_SPD,
           };
 
-          // Smoothed display state — lerps toward physics state each Cesium preUpdate,
-          // decoupling visual position from the rAF physics tick.
-          const smooth = {
-            lat: missileStateRef.current.lat,
-            lon: missileStateRef.current.lon,
-            alt: missileStateRef.current.alt,
-            heading: missileStateRef.current.heading,
-            pitch:   missileStateRef.current.pitch,
-            roll:    0,
-          };
-          const LERP = 0.22; // fraction to close per render frame (~60 fps → smooth)
-
           const _mPos  = new C.Cartesian3();
           const _mHPR  = new C.HeadingPitchRoll();
           const _mQuat = new C.Quaternion();
@@ -910,23 +919,17 @@ export default function Level6Game({ playerName, onPlayAgain }) {
           const getMissilePos = () => {
             const ms = missileStateRef.current;
             if (!ms) return _mPos;
-            // Lerp display state toward physics state
-            smooth.lat     += (ms.lat     - smooth.lat)     * LERP;
-            smooth.lon     += (ms.lon     - smooth.lon)     * LERP;
-            smooth.alt     += (ms.alt     - smooth.alt)     * LERP;
-            smooth.heading += (ms.heading - smooth.heading) * LERP;
-            smooth.pitch   += (ms.pitch   - smooth.pitch)   * LERP;
-            smooth.roll    += ((ms.roll || 0) - smooth.roll) * LERP;
-            return C.Cartesian3.fromDegrees(smooth.lon, smooth.lat, smooth.alt, C.Ellipsoid.WGS84, _mPos);
+            return C.Cartesian3.fromDegrees(ms.lon, ms.lat, ms.alt, C.Ellipsoid.WGS84, _mPos);
           };
 
           const makeOrientationCb = () => new C.CallbackProperty(() => {
-            if (!missileStateRef.current) return null;
-            _mHPR.heading = smooth.heading * Math.PI / 180 + Math.PI / 2;
-            _mHPR.pitch   = smooth.pitch   * Math.PI / 180;
-            _mHPR.roll    = smooth.roll    * Math.PI / 180;
+            const ms = missileStateRef.current;
+            if (!ms) return null;
+            _mHPR.heading = ms.heading * Math.PI / 180 + Math.PI / 2;
+            _mHPR.pitch   = ms.pitch   * Math.PI / 180;
+            _mHPR.roll    = (ms.roll || 0) * Math.PI / 180;
             return C.Transforms.headingPitchRollQuaternion(
-              C.Cartesian3.fromDegrees(smooth.lon, smooth.lat, smooth.alt),
+              C.Cartesian3.fromDegrees(ms.lon, ms.lat, ms.alt),
               _mHPR, C.Ellipsoid.WGS84, undefined, _mQuat
             );
           }, false);
@@ -1045,24 +1048,9 @@ export default function Level6Game({ playerName, onPlayAgain }) {
       // Keep heading fixed (start heading)
       f.heading = START_HDG;
 
-      // ── Guided missile physics ─────────────────────────────────────────────
+      // ── Missile SAM / hit / terrain checks (physics runs in preUpdate) ────
       if (missileRef.current) {
-        const ms  = missileStateRef.current;
-        const DZ  = 0.06;
-        const dz  = v => { const s = Math.sign(v), a = Math.abs(v); return a < DZ ? 0 : s * (a - DZ) / (1 - DZ); };
-
-        // Mouse steers missile; bank into turns like an aircraft
-        ms.heading = ((ms.heading + dz(m.nx) * 70 * dt) + 360) % 360;
-        ms.pitch   = clamp(ms.pitch + (-dz(m.ny)) * 30 * dt, -60, 40);
-        // Roll proportional to horizontal input — bank into the turn
-        const targetRoll = -dz(m.nx) * 55;
-        ms.roll = ms.roll + (targetRoll - ms.roll) * 5 * dt;
-
-        const mSpeedMs = ms.speed;
-        const mHdgRad  = ms.heading * Math.PI / 180;
-        ms.lat += mSpeedMs * dt * Math.cos(mHdgRad) / 111320;
-        ms.lon += mSpeedMs * dt * Math.sin(mHdgRad) / (111320 * Math.cos(ms.lat * Math.PI / 180));
-        ms.alt  = ms.alt + mSpeedMs * Math.sin(ms.pitch * Math.PI / 180) * dt;
+        const ms = missileStateRef.current;
 
         // ── SAM intercept: any condition held for ≥3 continuous seconds ────────────
         // • >3000 ft AGL anywhere
