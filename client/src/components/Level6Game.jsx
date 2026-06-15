@@ -528,6 +528,7 @@ export default function Level6Game({ playerName, onPlayAgain }) {
   const missileStateRef    = useRef(null);
   const msViolationRef     = useRef({ start: null, graceUntil: null, intercepting: false });
   const rafFrameCountRef   = useRef(0);
+  const targetHitRef       = useRef(false);  // true after hit — switches to 100% target cam
   // pendingLaunchRef removed: immediate launch on confirm (second Space)
   const periodicAnnounceRef = useRef(null);
   const awaitLaunchConfirmRef = useRef(false);
@@ -876,6 +877,7 @@ export default function Level6Game({ playerName, onPlayAgain }) {
 
         // Second press confirms launch: create missile immediately
         awaitLaunchConfirmRef.current = false;
+        targetHitRef.current = false;   // restore 80/10/10 split for new missile
         addLog('LAUNCH CONFIRMED — Missile away', 'info');
           // Initial missile state: launch from aircraft position, heading toward target
           const dLonRad = (tgt.lon - f.lon) * Math.PI / 180;
@@ -1139,6 +1141,7 @@ export default function Level6Game({ playerName, onPlayAgain }) {
 
         if (distH < 350 && aglAtTgt > -30 && aglAtTgt < 60) {
           // ── HIT ────────────────────────────────────────────────────────────
+          targetHitRef.current = true;   // redirect all rendering to target cam
           clearMissile();
           destroyedRef.current.add(targetIdx);
           triggerMoabExplosion(viewer, C, tgt.lat, tgt.lon, addLog, tgt.name, containerRef.current, groundAtTgt);
@@ -1426,16 +1429,17 @@ export default function Level6Game({ playerName, onPlayAgain }) {
         }
       }
 
-      // ── 80 / 10 / 10 viewer rendering ────────────────────────────────────
-      // Chase cam gets 8 of every 10 rAF frames; main cockpit and target cam
-      // each get 1, staggered so no two heavy renders happen in the same frame.
+      // ── Proportional viewer rendering ─────────────────────────────────────
       const fc = (rafFrameCountRef.current = (rafFrameCountRef.current + 1) % 10);
-      if (fc < 8) {                                      // chase cam  80 %
+      if (targetHitRef.current) {                        // post-hit: 100% target cam
+        const tcam2 = targetCamRef.current;
+        if (tcam2 && !tcam2.isDestroyed()) tcam2.render();
+      } else if (fc < 8) {                              // in-flight: chase cam 80%
         const pip2 = pipViewerRef.current;
         if (pip2 && !pip2.isDestroyed()) pip2.render();
-      } else if (fc === 8) {                             // main view  10 %
+      } else if (fc === 8) {                            // in-flight: main view 10%
         if (!viewer.isDestroyed()) viewer.render();
-      } else {                                           // target cam 10 %
+      } else {                                          // in-flight: target cam 10%
         const tcam2 = targetCamRef.current;
         if (tcam2 && !tcam2.isDestroyed()) tcam2.render();
       }
