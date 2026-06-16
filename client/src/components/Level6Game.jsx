@@ -1713,6 +1713,32 @@ export default function Level6Game({ playerName, onPlayAgain }) {
             onMinute={speakMinutes6}
           />
 
+          {/* SAM ceiling limits — bottom-right, always visible */}
+          {!missionComplete && !failReason && (
+            <div style={{
+              position: 'absolute', bottom: 16, right: 16, zIndex: 40,
+              pointerEvents: 'none', fontFamily: 'var(--font-mono)',
+              display: 'flex', flexDirection: 'column', gap: '3px',
+            }}>
+              <div style={{ fontSize: '.52rem', color: 'rgba(255,140,0,.6)', letterSpacing: '.18em', marginBottom: 2 }}>
+                ⚠ SAM INTERCEPT LIMITS
+              </div>
+              {[
+                ['MSL CEILING',    '10,000 FT'],
+                ['AGL CEILING',     '3,000 FT'],
+                ['TGT ZONE (5 MI)',   '500 FT AGL'],
+              ].map(([label, val]) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.2rem' }}>
+                  <span style={{ fontSize: '.55rem', color: 'rgba(255,255,255,.4)', letterSpacing: '.1em' }}>{label}</span>
+                  <span style={{ fontSize: '.55rem', color: 'rgba(255,140,0,.85)', fontWeight: 700, letterSpacing: '.08em' }}>{val}</span>
+                </div>
+              ))}
+              <div style={{ fontSize: '.48rem', color: 'rgba(255,255,255,.25)', letterSpacing: '.1em', marginTop: 3 }}>
+                HOLD 3 s → INTERCEPT
+              </div>
+            </div>
+          )}
+
           {/* Mission accomplished overlay */}
           {missionComplete && (
             <div style={{
