@@ -1462,8 +1462,11 @@ export default function Level6Game({ playerName, onPlayAgain }) {
           else         { if (!viewer.isDestroyed()) viewer.render(); }
         }
       } else {
-        // No missile: cockpit view
-        if (!viewer.isDestroyed()) viewer.render();
+        // No missile: cycle all three viewers equally (~33% each)
+        const idle = fc % 3;
+        if (idle === 0) { if (!viewer.isDestroyed()) viewer.render(); }
+        else if (idle === 1) { if (pip2  && !pip2.isDestroyed())  pip2.render();  }
+        else                 { if (tcam2 && !tcam2.isDestroyed()) tcam2.render(); }
       }
 
       rafRef.current = requestAnimationFrame(animate);
