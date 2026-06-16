@@ -394,9 +394,9 @@ function CountdownClock6({ onExpire, onMinute, active }) {
   if (!active) return null;
   return (
     <div style={{
-      position: 'absolute', top: 18, left: '50%', transform: 'translateX(-50%)',
+      position: 'absolute', bottom: 16, left: 16,
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      pointerEvents: 'none', zIndex: 15,
+      pointerEvents: 'none', zIndex: 40,
     }}>
       <div style={{
         fontFamily: 'var(--font-mono)', fontWeight: 700,
