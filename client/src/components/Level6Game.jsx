@@ -374,15 +374,60 @@ function drawHUD(canvas, f, targets = [], missileActive = false, distToTarget = 
   
 }
 
+// ── Countdown clock ───────────────────────────────────────────────────────────
+const SUPREME_IDX = GOV_TARGETS.findIndex(t => t.name === 'SUPREME LEADER HQ'); // 3
+const fmtTime6 = s =>
+  `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+function CountdownClock6({ onExpire, onMinute, active }) {
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
+  useEffect(() => {
+    if (!active || timeLeft <= 0) return;
+    const id = setTimeout(() => {
+      const next = timeLeft - 1;
+      if (next % 60 === 0 && next > 0) onMinute(next / 60);
+      if (next <= 0) onExpire();
+      setTimeLeft(next);
+    }, 1000);
+    return () => clearTimeout(id);
+  }, [timeLeft, active, onExpire, onMinute]);
+  if (!active) return null;
+  return (
+    <div style={{
+      position: 'absolute', top: 18, left: '50%', transform: 'translateX(-50%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      pointerEvents: 'none', zIndex: 15,
+    }}>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontWeight: 700,
+        fontSize: timeLeft <= 60 ? '7rem' : '6.5rem',
+        lineHeight: 1, letterSpacing: '.08em',
+        color: timeLeft <= 60 ? '#FF3030' : timeLeft <= 120 ? '#FF8800' : 'var(--cyan)',
+        textShadow: timeLeft <= 60
+          ? '0 0 40px rgba(255,48,48,.9), 0 0 80px rgba(255,48,48,.5)'
+          : timeLeft <= 120 ? '0 0 30px rgba(255,136,0,.8)'
+          : '0 0 24px rgba(0,212,255,.6)',
+        animation: timeLeft <= 30 ? 'pulse .6s ease-in-out infinite' : 'none',
+      }}>
+        {fmtTime6(timeLeft)}
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: '.65rem',
+        letterSpacing: '.22em', color: 'rgba(255,255,255,.35)', marginTop: '.15rem',
+      }}>
+        TIME REMAINING
+      </div>
+    </div>
+  );
+}
+
 // ── Briefing ──────────────────────────────────────────────────────────────────
 const buildNarration6 = (name) =>
-  `Commander ${name}. By direct order of President Trump, you are to annihilate all traces of Iran's oppressive Islamic rule. ` +
-  'You are aboard a B-1B Lancer inbound from the Caspian Sea, heading south toward Tehran. ' +
-  'Ten high-value government targets have been pre-selected. ' +
-  'You will remotely guide cruise missiles through the Alborz mountain passes toward their objectives in the city. ' +
-  'Stay low. Avoid detection. The enemy\'s missile defense systems are active. ' +
-  'Use Tab to cycle targets. Press Space to launch. Guide with your mouse. ' +
-  `Leave nothing standing. Good hunting, Commander ${name}.`;
+  `Commander ${name}. Intelligence flash — Supreme Leader Ayatollah Khamenei has just called an emergency meeting of his top commanders at Supreme Leader Headquarters in Tehran. ` +
+  `He is confirmed on site. Window is ten minutes. ` +
+  `You are aboard a B-1B Lancer inbound from the Caspian Sea. Guide your cruise missile through the Alborz mountain passes and take him out. ` +
+  `Stay low. Avoid the SAM networks. The clock is ticking. ` +
+  `Good hunting, Commander ${name}.`;
 
 function Level6Briefing({ onReady, playerName }) {
   const [subtitle,  setSubtitle]  = useState('');
@@ -442,21 +487,22 @@ function Level6Briefing({ onReady, playerName }) {
           display: 'flex', flexDirection: 'column', gap: '1.6rem',
         }}>
           <div style={{ fontSize: '.5rem', color: 'var(--t-ghost)', letterSpacing: '.22em' }}>
-            WEAPONS OFFICER BRIEFING — B-1B LANCER / OP-IRON FIST
+            PRIORITY FLASH — B-1B LANCER / OP-IRON FIST
           </div>
           <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#fff', letterSpacing: '.1em', lineHeight: 1.2 }}>
-            ELIMINATE IRAN'S<br />ISLAMIC REGIME — 10 TARGETS
+            NEUTRALIZE SUPREME LEADER<br />KHAMENEI — 10 MIN WINDOW
           </div>
           {[
-            ['PLATFORM',  'B-1B LANCER — INBOUND SOUTH',      'var(--cyan)'],
-            ['INGRESS',   'CASPIAN SEA → ALBORZ MTN PASS',    'rgba(255,255,255,.7)'],
-            ['AO',        'TEHRAN METROPOLITAN AREA, IRN',     'rgba(255,255,255,.7)'],
-            ['AUTHORITY', 'DIRECT ORDER — PRESIDENT TRUMP',   '#FF2020'],
-            ['THREAT',    'ACTIVE SAM NETWORKS — STAY LOW',   'var(--amber)'],
-            ['Tab',       'CYCLE TARGETS',                    '#00FF88'],
-            ['Space',     'LAUNCH CRUISE MISSILE',            '#FF2020'],
-            ['Mouse',     'GUIDE MISSILE THROUGH MOUNTAINS',  'var(--cyan)'],
-            ['OBJECTIVE', 'DESTROY ALL 10 GOV TARGETS',       '#FF2020'],
+            ['PLATFORM',  'B-1B LANCER — INBOUND SOUTH',           'var(--cyan)'],
+            ['INGRESS',   'CASPIAN SEA → ALBORZ MTN PASS',         'rgba(255,255,255,.7)'],
+            ['TARGET',    'SUPREME LEADER HQ — TEHRAN',             '#FF2020'],
+            ['INTEL',     'KHAMENEI CONFIRMED ON SITE',             '#FF8C00'],
+            ['WINDOW',    '10 MINUTES — CLOCK STARTS ON GO',        '#FF2020'],
+            ['THREAT',    'ACTIVE SAM NETWORKS — STAY LOW',         'var(--amber)'],
+            ['Tab',       'CYCLE TARGETS',                          '#00FF88'],
+            ['Space',     'LAUNCH CRUISE MISSILE',                  '#FF2020'],
+            ['Mouse',     'GUIDE MISSILE THROUGH MOUNTAINS',        'var(--cyan)'],
+            ['OBJECTIVE', 'DESTROY SUPREME LEADER HQ IN 10 MIN',   '#FF2020'],
           ].map(([k, v, col]) => (
             <div key={k} style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
@@ -539,10 +585,13 @@ export default function Level6Game({ playerName, onPlayAgain }) {
   const pipHudCanvasRef  = useRef(null);   // HUD overlay drawn on top of PIP Cesium canvas
   const tcamHudCanvasRef = useRef(null);   // HUD overlay drawn on top of target cam canvas
 
+  const missionEndedRef  = useRef(false);   // true on win or fail — blocks further launches
+
   const [briefing,        setBriefing]        = useState(true);
   const [missileActive,   setMissileActive]   = useState(false);
   const [missileEverFired, setMissileEverFired] = useState(false);
   const [missionComplete,  setMissionComplete]  = useState(false);
+  const [failReason,       setFailReason]       = useState(null);
   const [chaseConnLost,    setChaseConnLost]    = useState(false);
   const [showAlborz,       setShowAlborz]       = useState(false);
   const [log,             setLog]             = useState([
@@ -557,6 +606,18 @@ export default function Level6Game({ playerName, onPlayAgain }) {
     setLog(prev => [...prev, { ts: timestamp(), msg, cls }].slice(-80));
     setTimeout(() => logEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   }, []);
+
+  const speakMinutes6 = useCallback(n => {
+    try { speakReport(`You have ${n} minute${n !== 1 ? 's' : ''} remaining`); } catch (e) {}
+  }, []);
+
+  const handleClockExpire = useCallback(() => {
+    if (destroyedRef.current.has(SUPREME_IDX)) return; // already won
+    missionEndedRef.current = true;
+    setFailReason('TIME EXPIRED — SUPREME LEADER ESCAPED');
+    addLog('⚠ TIME EXPIRED — MISSION FAILED — RETURN TO BASE', 'warn');
+    try { speakReport('Time expired. Mission failed. Return to base.'); } catch (e) {}
+  }, [addLog]);
 
   // ── Main Cesium viewer ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -848,6 +909,7 @@ export default function Level6Game({ playerName, onPlayAgain }) {
       if (e.key === ' ') {
         e.preventDefault();
         if (missileRef.current) return;
+        if (missionEndedRef.current) return;
         // prevent rapid double-press while awaiting confirmation
         if (awaitLaunchConfirmRef.current === true && missileRef.current == null) {
           // allow proceed to confirmation/launch
@@ -1152,7 +1214,8 @@ export default function Level6Game({ playerName, onPlayAgain }) {
           const _tc = targetCamRef.current;
           if (_tc && !_tc.isDestroyed()) triggerMoabExplosion(_tc, C, tgt.lat, tgt.lon, addLog, tgt.name, null, groundAtTgt, true);
           setTimeout(() => setChaseConnLost(true), 800);
-          if (destroyedRef.current.size >= GOV_TARGETS.length) {
+          if (destroyedRef.current.has(SUPREME_IDX)) {
+            missionEndedRef.current = true;
             setTimeout(() => setMissionComplete(true), 3000);
           }
         } else {
@@ -1643,7 +1706,14 @@ export default function Level6Game({ playerName, onPlayAgain }) {
             )}
           </div>
 
-          {/* Mission complete overlay */}
+          {/* Countdown clock */}
+          <CountdownClock6
+            active={!briefing && !missionComplete && !failReason}
+            onExpire={handleClockExpire}
+            onMinute={speakMinutes6}
+          />
+
+          {/* Mission accomplished overlay */}
           {missionComplete && (
             <div style={{
               position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
@@ -1654,11 +1724,38 @@ export default function Level6Game({ playerName, onPlayAgain }) {
                 fontFamily: 'var(--font-mono)', fontSize: '2.2rem', fontWeight: 700,
                 color: '#00FF88', letterSpacing: '.2em', textAlign: 'center',
                 textShadow: '0 0 30px rgba(0,255,136,.8)',
+                animation: 'pulse 1.2s ease-in-out infinite',
               }}>
-                MISSION COMPLETE
+                MISSION ACCOMPLISHED
               </div>
               <div style={{ marginTop: '.8rem', fontFamily: 'var(--font-mono)', fontSize: '.9rem', color: '#00FF88', letterSpacing: '.15em' }}>
-                ALL TARGETS ELIMINATED
+                SUPREME LEADER ELIMINATED
+              </div>
+              <button className="btn-secondary"
+                style={{ marginTop: '2rem', color: 'var(--cyan)', borderColor: 'rgba(0,212,255,.4)' }}
+                onClick={onPlayAgain}>
+                ← Return to Missions
+              </button>
+            </div>
+          )}
+
+          {/* Mission failed overlay */}
+          {failReason && !missionComplete && (
+            <div style={{
+              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', zIndex: 50,
+              background: 'rgba(0,0,0,.82)',
+            }}>
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: '2.2rem', fontWeight: 700,
+                color: '#FF2020', letterSpacing: '.2em', textAlign: 'center',
+                textShadow: '0 0 30px rgba(255,32,32,.8)',
+                animation: 'pulse 1.2s ease-in-out infinite',
+              }}>
+                MISSION FAILED
+              </div>
+              <div style={{ marginTop: '.8rem', fontFamily: 'var(--font-mono)', fontSize: '.9rem', color: '#FF6060', letterSpacing: '.15em' }}>
+                {failReason}
               </div>
               <button className="btn-secondary"
                 style={{ marginTop: '2rem', color: 'var(--cyan)', borderColor: 'rgba(0,212,255,.4)' }}
