@@ -527,8 +527,9 @@ export default function Level6Game({ playerName, onPlayAgain }) {
   const missileRef         = useRef(null);
   const missileStateRef    = useRef(null);
   const msViolationRef     = useRef({ start: null, graceUntil: null, intercepting: false });
-  const rafFrameCountRef   = useRef(0);
-  const targetHitRef       = useRef(false);  // true after hit — switches to 100% target cam
+  const rafFrameCountRef     = useRef(0);
+  const targetHitRef         = useRef(false);   // true after hit → 100% target cam
+  const missileLaunchTimeRef = useRef(null);    // Date.now() at launch for 30s phase timer
   // pendingLaunchRef removed: immediate launch on confirm (second Space)
   const periodicAnnounceRef = useRef(null);
   const awaitLaunchConfirmRef = useRef(false);
@@ -877,7 +878,8 @@ export default function Level6Game({ playerName, onPlayAgain }) {
 
         // Second press confirms launch: create missile immediately
         awaitLaunchConfirmRef.current = false;
-        targetHitRef.current = false;   // restore 80/10/10 split for new missile
+        targetHitRef.current = false;
+        missileLaunchTimeRef.current = Date.now();
         addLog('LAUNCH CONFIRMED — Missile away', 'info');
           // Initial missile state: launch from aircraft position, heading toward target
           const dLonRad = (tgt.lon - f.lon) * Math.PI / 180;
@@ -1429,19 +1431,39 @@ export default function Level6Game({ playerName, onPlayAgain }) {
         }
       }
 
-      // ── Proportional viewer rendering ─────────────────────────────────────
-      const fc = (rafFrameCountRef.current = (rafFrameCountRef.current + 1) % 10);
-      if (targetHitRef.current) {                        // post-hit: 100% target cam
-        const tcam2 = targetCamRef.current;
+      // ── Phased viewer rendering ───────────────────────────────────────────
+      // Phase 4 (hit):        100% target cam
+      // Phase 3 (< 8 km):     80% chase  /  20% target  /  0% main
+      // Phase 2 (> 30 s):    100% chase  /   0% target  /  0% main
+      // Phase 1 (0–30 s):     90% chase  /   0% target  / 10% main
+      // No missile:          100% main
+      const fc    = (rafFrameCountRef.current = (rafFrameCountRef.current + 1) % 10);
+      const pip2  = pipViewerRef.current;
+      const tcam2 = targetCamRef.current;
+      if (targetHitRef.current) {
+        // Phase 4 — explosion: everything to target cam
         if (tcam2 && !tcam2.isDestroyed()) tcam2.render();
-      } else if (fc < 8) {                              // in-flight: chase cam 80%
-        const pip2 = pipViewerRef.current;
-        if (pip2 && !pip2.isDestroyed()) pip2.render();
-      } else if (fc === 8) {                            // in-flight: main view 10%
+      } else if (missileRef.current && missileStateRef.current) {
+        const _ms2    = missileStateRef.current;
+        const _tgt2   = GOV_TARGETS[missileRef.current.targetIdx ?? selectedIdxRef.current];
+        const _distKm = distKm(_ms2.lat, _ms2.lon, _tgt2.lat, _tgt2.lon);
+        const _elapsedMs = missileLaunchTimeRef.current ? Date.now() - missileLaunchTimeRef.current : 0;
+
+        if (_distKm < 8) {
+          // Phase 3 — near target: 80% chase, 20% target
+          if (fc < 8) { if (pip2  && !pip2.isDestroyed())  pip2.render();  }
+          else         { if (tcam2 && !tcam2.isDestroyed()) tcam2.render(); }
+        } else if (_elapsedMs > 30000) {
+          // Phase 2 — >30 s: 100% chase
+          if (pip2 && !pip2.isDestroyed()) pip2.render();
+        } else {
+          // Phase 1 — first 30 s: 90% chase, 10% main
+          if (fc < 9) { if (pip2 && !pip2.isDestroyed()) pip2.render(); }
+          else         { if (!viewer.isDestroyed()) viewer.render(); }
+        }
+      } else {
+        // No missile: cockpit view
         if (!viewer.isDestroyed()) viewer.render();
-      } else {                                          // in-flight: target cam 10%
-        const tcam2 = targetCamRef.current;
-        if (tcam2 && !tcam2.isDestroyed()) tcam2.render();
       }
 
       rafRef.current = requestAnimationFrame(animate);
