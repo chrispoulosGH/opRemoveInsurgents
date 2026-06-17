@@ -40,7 +40,7 @@ function timestamp() {
 }
 
 // ── HUD Canvas Drawing ────────────────────────────────────────────────────────
-function drawHUD(canvas, f, extra = null) {
+function drawHUD(canvas, f, extra = null, isMob = false) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   const cx = W / 2, cy = H / 2;
@@ -196,7 +196,7 @@ function drawHUD(canvas, f, extra = null) {
     ctx.fillStyle = HUD_G;
     ctx.fillText(`BRG ${brgStr}°  /  DST ${distKm.toFixed(1)} km`, 14, H - 30);
     ctx.fillStyle = missileActive ? '#FF8C00' : tgtDestroyed ? '#00FF88' : '#FF2020';
-    ctx.fillText(missileActive ? '◉ MISSILE AWAY' : tgtDestroyed ? '✓ ELIMINATED' : '▶ SPACE TO FIRE', 14, H - 14);
+    ctx.fillText(missileActive ? '◉ MISSILE AWAY' : tgtDestroyed ? '✓ ELIMINATED' : (isMob ? '▶ TAP FIRE BTN' : '▶ SPACE TO FIRE'), 14, H - 14);
   }
 }
 
@@ -204,8 +204,8 @@ function drawHUD(canvas, f, extra = null) {
 const buildNarration5 = (name) =>
   `Commander ${name}. You are at the controls of an F-22 Raptor, combat loaded and on station. ` +
   'You are operating over the Hindu Kush. Three enemy firebases are active in your sector. ' +
-  'Move your mouse to control pitch and roll. Hold W to increase throttle, S to decrease. ' +
-  'Use Tab to cycle targets. Press Space to fire. ' +
+  'Drag on screen to control pitch and roll. Use throttle buttons or W and S keys to adjust speed. ' +
+  'Use the cycle button or Tab to select targets. Tap the Fire button or press Space to fire. ' +
   'Each missile must impact within fifty yards. Any miss or SAM intercept is mission failure. ' +
   `Stay low. Good hunting, Commander ${name}.`;
 
@@ -265,7 +265,7 @@ function Level5Briefing({ onReady, playerName }) {
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
         {/* F-22 silhouette / mission art placeholder */}
         <div style={{
-          width: '55vw', border: '1px solid rgba(0,212,255,.25)', padding: '2.5rem',
+          width: 'min(520px, 90vw)', border: '1px solid rgba(0,212,255,.25)', padding: '2.5rem',
           display: 'flex', flexDirection: 'column', gap: '1.6rem',
         }}>
           <div style={{ fontSize: '.5rem', color: 'var(--t-ghost)', letterSpacing: '.22em' }}>
@@ -278,10 +278,10 @@ function Level5Briefing({ onReady, playerName }) {
             ['PLATFORM',  'F-22A RAPTOR', 'var(--cyan)'],
             ['AO',        'HINDU KUSH / NANGARHAR', 'rgba(255,255,255,.7)'],
             ['TARGETS',   '3 ENEMY FIREBASES', '#FF2020'],
-            ['CONTROLS',  'MOUSE — PITCH / ROLL', 'var(--cyan)'],
-            ['THROTTLE',  'W = INCREASE  /  S = DECREASE', 'var(--cyan)'],
-            ['Tab',       'CYCLE TARGETS', '#00FF88'],
-            ['Space',     'FIRE MISSILE', '#FF2020'],
+            ['STEER',     'MOUSE DRAG / TOUCH DRAG', 'var(--cyan)'],
+            ['THROTTLE',  'W/S  or  ▲ ▼ BUTTONS', 'var(--cyan)'],
+            ['TAB / BTN', 'CYCLE TARGETS', '#00FF88'],
+            ['SPC / BTN', 'FIRE MISSILE', '#FF2020'],
             ['ACCURACY',  '50 YARDS — MISS = MISSION FAILURE', '#FF8800'],
           ].map(([k, v, col]) => (
             <div key={k} style={{
@@ -317,7 +317,7 @@ function Level5Briefing({ onReady, playerName }) {
           {subtitle || 'Awaiting audio briefing...'}
         </div>
         <div style={{ fontSize: '.58rem', color: 'var(--t-ghost)', letterSpacing: '.1em', whiteSpace: 'nowrap' }}>
-          CLICK TO SKIP
+          TAP / CLICK TO SKIP
         </div>
       </div>
     </div>
@@ -369,9 +369,32 @@ export default function Level5Game({ playerName, onPlayAgain }) {
   ]);
   const logEndRef = useRef(null);
 
+  const isMobileRef = useRef(typeof window !== 'undefined' && (window.innerWidth < 900 || 'ontouchstart' in window));
+  const [isMobile, setIsMobile] = useState(isMobileRef.current);
+
   const addLog = useCallback((msg, cls = '') => {
     setLog(prev => [...prev, { ts: timestamp(), msg, cls }].slice(-80));
     setTimeout(() => logEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+  }, []);
+
+  useEffect(() => {
+    const check = () => {
+      const m = window.innerWidth < 900 || 'ontouchstart' in window;
+      isMobileRef.current = m;
+      setIsMobile(m);
+    };
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  const handleFireMobile = useCallback(() => { fireMissileRef.current = true; }, []);
+  const handleCycleMobile = useCallback(() => {
+    if (missionEndRef.current) return;
+    setSelectedTgt(prev => {
+      const next = (prev + 1) % TARGETS_5.length;
+      selectedTgtRef.current = next;
+      return next;
+    });
   }, []);
 
   // ── Cesium init ─────────────────────────────────────────────────────────────
@@ -397,10 +420,11 @@ export default function Level5Game({ playerName, onPlayAgain }) {
       new C.UrlTemplateImageryProvider({ url: ESRI_SAT, maximumLevel: 19 })
     );
     viewer.scene.globe.depthTestAgainstTerrain = true;
-    viewer.scene.globe.maximumScreenSpaceError = 4;
-    viewer.scene.globe.tileCacheSize           = 500;
+    const _isMob = window.innerWidth < 900 || 'ontouchstart' in window;
+    viewer.scene.globe.maximumScreenSpaceError = _isMob ? 8 : 4;
+    viewer.scene.globe.tileCacheSize           = _isMob ? 200 : 500;
     viewer.scene.fog.enabled = true;
-    viewer.scene.fog.density = 0.00012;
+    viewer.scene.fog.density = _isMob ? 0.0003 : 0.00012;
 
     // Disable all Cesium mouse navigation — we drive the camera ourselves
     const ctrl = viewer.scene.screenSpaceCameraController;
@@ -429,7 +453,7 @@ export default function Level5Game({ playerName, onPlayAgain }) {
     return () => { if (!viewer.isDestroyed()) viewer.destroy(); };
   }, []); // eslint-disable-line
 
-  // ── Mouse tracking ──────────────────────────────────────────────────────────
+  // ── Mouse + touch tracking ──────────────────────────────────────────────────
   useEffect(() => {
     const board = boardRef.current;
     if (!board) return;
@@ -441,8 +465,26 @@ export default function Level5Game({ playerName, onPlayAgain }) {
         ny: clamp((e.clientY - r.top  - cy) / cy, -1, 1),
       };
     };
+    const onTouchMove = e => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      if (!touch) return;
+      const r = board.getBoundingClientRect();
+      const cx = r.width / 2, cy = r.height / 2;
+      mouseRef.current = {
+        nx: clamp((touch.clientX - r.left - cx) / cx, -1, 1),
+        ny: clamp((touch.clientY - r.top  - cy) / cy, -1, 1),
+      };
+    };
+    const onTouchEnd = () => { mouseRef.current = { nx: 0, ny: 0 }; };
     board.addEventListener('mousemove', onMove);
-    return () => board.removeEventListener('mousemove', onMove);
+    board.addEventListener('touchmove', onTouchMove, { passive: false });
+    board.addEventListener('touchend',  onTouchEnd);
+    return () => {
+      board.removeEventListener('mousemove',  onMove);
+      board.removeEventListener('touchmove',  onTouchMove);
+      board.removeEventListener('touchend',   onTouchEnd);
+    };
   }, []);
 
   // ── Keyboard ────────────────────────────────────────────────────────────────
@@ -702,7 +744,7 @@ export default function Level5Game({ playerName, onPlayAgain }) {
           distKm: distM5(f.lat, f.lon, selObj.lat, selObj.lon) / 1000,
           missileActive: !!missileStateRef.current,
           tgtDestroyed: destroyedRef.current.has(selectedTgtRef.current),
-        });
+        }, isMobileRef.current);
       }
 
       rafRef.current = requestAnimationFrame(animate);
@@ -748,8 +790,8 @@ export default function Level5Game({ playerName, onPlayAgain }) {
 
       <div className="game-body">
 
-        {/* Left sidebar — controls & instruments */}
-        <div className="sidebar">
+        {/* Left sidebar — controls & instruments (hidden on mobile) */}
+        {!isMobile && <div className="sidebar">
           <div className="panel">
             <div className="panel-title accent">// Flight Controls</div>
             {[
@@ -790,13 +832,13 @@ export default function Level5Game({ playerName, onPlayAgain }) {
           <button className="btn-secondary" style={{ marginTop: 'auto' }} onClick={onPlayAgain}>
             ← Return to Missions
           </button>
-        </div>
+        </div>}
 
         {/* 3D Cesium cockpit view */}
         <div
           ref={boardRef}
           className="board-area"
-          style={{ padding: 0, overflow: 'hidden', position: 'relative', alignItems: 'stretch', cursor: 'none' }}
+          style={{ padding: 0, overflow: 'hidden', position: 'relative', alignItems: 'stretch', cursor: isMobile ? 'default' : 'none', touchAction: 'none' }}
         >
           <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
 
@@ -809,14 +851,87 @@ export default function Level5Game({ playerName, onPlayAgain }) {
             }}
           />
 
-          {/* Mouse centre indicator */}
-          <div style={{
-            position: 'absolute', top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 6, height: 6, borderRadius: '50%',
-            border: '1px solid rgba(0,255,65,.4)',
-            pointerEvents: 'none', zIndex: 16,
-          }} />
+          {/* Centre indicator — hidden on mobile */}
+          {!isMobile && (
+            <div style={{
+              position: 'absolute', top: '50%', left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 6, height: 6, borderRadius: '50%',
+              border: '1px solid rgba(0,255,65,.4)',
+              pointerEvents: 'none', zIndex: 16,
+            }} />
+          )}
+
+          {/* Mobile touch controls overlay */}
+          {isMobile && !crashed && !missionFailed && !missionSuccess && (
+            <>
+              {/* Drag-to-steer hint (fades behind HUD) */}
+              <div style={{
+                position: 'absolute', top: '52%', left: '50%',
+                transform: 'translate(-50%, -50%)',
+                fontFamily: 'var(--font-mono)', fontSize: '.5rem',
+                color: 'rgba(0,255,65,.18)', letterSpacing: '.2em',
+                pointerEvents: 'none', zIndex: 16, textAlign: 'center',
+              }}>DRAG TO STEER</div>
+
+              {/* Throttle buttons — bottom-left */}
+              <div style={{
+                position: 'absolute', left: 12, bottom: 24, zIndex: 30,
+                display: 'flex', flexDirection: 'column', gap: 8,
+              }}>
+                {[['▲ THR', true], ['▼ THR', false]].map(([label, isUp]) => (
+                  <button key={label}
+                    onTouchStart={e => { e.preventDefault(); keysRef.current[isUp ? 'w' : 's'] = true; }}
+                    onTouchEnd={e => { e.preventDefault(); keysRef.current[isUp ? 'w' : 's'] = false; }}
+                    onMouseDown={() => keysRef.current[isUp ? 'w' : 's'] = true}
+                    onMouseUp={() => keysRef.current[isUp ? 'w' : 's'] = false}
+                    style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '.75rem', fontWeight: 700,
+                      letterSpacing: '.1em', color: '#fff',
+                      background: isUp ? 'rgba(0,160,60,.55)' : 'rgba(180,60,0,.55)',
+                      border: `1px solid ${isUp ? 'rgba(0,255,100,.35)' : 'rgba(255,100,0,.35)'}`,
+                      borderRadius: 6, padding: '10px 18px',
+                      cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none',
+                      touchAction: 'none',
+                    }}
+                  >{label}</button>
+                ))}
+              </div>
+
+              {/* Target cycle + Fire buttons — bottom-right */}
+              <div style={{
+                position: 'absolute', right: 12, bottom: 24, zIndex: 30,
+                display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end',
+              }}>
+                <button
+                  onTouchStart={e => { e.preventDefault(); handleCycleMobile(); }}
+                  onMouseDown={handleCycleMobile}
+                  style={{
+                    fontFamily: 'var(--font-mono)', fontSize: '.75rem', fontWeight: 700,
+                    letterSpacing: '.1em', color: '#fff',
+                    background: 'rgba(0,100,180,.55)',
+                    border: '1px solid rgba(0,160,255,.35)',
+                    borderRadius: 6, padding: '10px 18px',
+                    cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none',
+                    touchAction: 'none',
+                  }}
+                >↻ TARGET</button>
+                <button
+                  onTouchStart={e => { e.preventDefault(); handleFireMobile(); }}
+                  onMouseDown={handleFireMobile}
+                  style={{
+                    fontFamily: 'var(--font-mono)', fontSize: '1rem', fontWeight: 700,
+                    letterSpacing: '.12em', color: '#fff',
+                    background: 'rgba(200,20,20,.7)',
+                    border: '1px solid rgba(255,60,60,.5)',
+                    borderRadius: 8, padding: '14px 26px',
+                    cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none',
+                    touchAction: 'none',
+                  }}
+                >◉ FIRE</button>
+              </div>
+            </>
+          )}
 
           {/* Crash overlay */}
           {crashed && (
@@ -889,8 +1004,8 @@ export default function Level5Game({ playerName, onPlayAgain }) {
           )}
         </div>
 
-        {/* Right sidebar — mission log */}
-        <div className="sidebar">
+        {/* Right sidebar — mission log (hidden on mobile) */}
+        {!isMobile && <div className="sidebar">
           <div className="panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <div className="panel-title">// Mission Log</div>
             <div className="log-list" style={{ flex: 1 }}>
@@ -903,7 +1018,7 @@ export default function Level5Game({ playerName, onPlayAgain }) {
               <div ref={logEndRef} />
             </div>
           </div>
-        </div>
+        </div>}
 
       </div>
     </div>
